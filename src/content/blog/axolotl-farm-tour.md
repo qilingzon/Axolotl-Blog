@@ -3,7 +3,7 @@ title: Minecraft 美西螈养殖场参观记
 description: 在繁茂洞穴旁边建一座美西螈养殖场是什么体验——选址、繁育和蓝色美西螈的执念。
 pubDate: 2026-10-16
 tags: [Minecraft, 游戏]
-accent: purple
+accent: blue
 ---
 
 周末在存档里干了一件大事：把基地旁边那个繁茂洞穴改造成了一座**美西螈养殖场**。这篇是参观导览。

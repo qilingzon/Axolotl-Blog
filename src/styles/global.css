@@ -482,9 +482,21 @@ a.card:hover {
 
 /* ---------- 美西螈图片通用 ---------- */
 
-/* 紫色变体：同一张粉色原图，CSS 色相旋转生成 */
+/* 五个色系变体：同一张粉色原图，CSS 滤镜生成（对应 Minecraft 美西螈色系） */
 .axolotl--purple {
   filter: hue-rotate(-55deg) saturate(1.08);
+}
+
+.axolotl--cyan {
+  filter: hue-rotate(-150deg) saturate(1.05);
+}
+
+.axolotl--gold {
+  filter: hue-rotate(65deg) saturate(1.15) brightness(1.08);
+}
+
+.axolotl--blue {
+  filter: hue-rotate(-115deg) saturate(0.92) brightness(0.98);
 }
 
 .axolotl {

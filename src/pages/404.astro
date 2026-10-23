@@ -3,11 +3,17 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Axolotl from '../components/Axolotl.astro';
 ---
 
-<BaseLayout title="迷路了" description="页面不存在——一只美西螈在洞穴里迷路了。">
+<BaseLayout title="迷路了" description="页面不存在——一群美西螈在洞穴里迷路了。">
   <section class="container lost">
-    <Axolotl variant="purple" mode="swim" size={180} class="lost__art" />
+    <div class="lost__squad" aria-hidden="true">
+      <Axolotl variant="pink" size={64} />
+      <Axolotl variant="purple" size={64} />
+      <Axolotl variant="cyan" size={64} />
+      <Axolotl variant="gold" size={64} />
+      <Axolotl variant="blue" size={64} />
+    </div>
     <h1 class="lost__code">404</h1>
-    <p>这只美西螈在洞穴里迷路了，页面也是。</p>
+    <p>页面迷路了，池塘全员出来找——目前它们自己也迷路了。</p>
     <a class="btn" href="/">带回池塘</a>
   </section>
 </BaseLayout>
@@ -21,8 +27,13 @@ import Axolotl from '../components/Axolotl.astro';
     padding: 80px 24px 0;
   }
 
-  .lost__art {
+  .lost__squad {
+    display: flex;
+    gap: 14px;
+    align-items: flex-end;
     animation: lost-float 4s ease-in-out infinite;
+    flex-wrap: wrap;
+    justify-content: center;
   }
 
   .lost__code {

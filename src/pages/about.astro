@@ -19,7 +19,7 @@ import { SITE } from '../config';
         <ul>
           <li>负责博客里所有带代码块的文章</li>
           <li>口头禅：「这能用 CSS 变量解决」</li>
-          <li>梦想是刷出一只蓝色美西螈（进度 0/1200）</li>
+          <li>梦想是刷出一只蓝色美西螈（进度 1/1200）</li>
         </ul>
       </div>
       <div class="card profile">
@@ -31,6 +31,28 @@ import { SITE } from '../config';
           <li>口头禅：「这个可以写得可爱一点」</li>
           <li>像素画自学中，代表作就是本站 logo</li>
         </ul>
+      </div>
+    </div>
+
+    <div class="card residents">
+      <h2>池塘住民</h2>
+      <p class="residents__hint">除了两位博主，池塘里还住着这些家伙（对，全家都是 Minecraft 色系）：</p>
+      <div class="residents__grid">
+        <div class="resident">
+          <Axolotl variant="cyan" size={72} />
+          <p class="resident__name">汽水</p>
+          <p class="resident__desc">青色系 · 泡泡爱好者，喜欢趴在气泡柱上看风景</p>
+        </div>
+        <div class="resident">
+          <Axolotl variant="gold" size={72} />
+          <p class="resident__name">焦糖</p>
+          <p class="resident__desc">金色系 · 干饭担当，热带鱼桶第一个下嘴的总是它</p>
+        </div>
+        <div class="resident">
+          <Axolotl variant="blue" size={72} />
+          <p class="resident__name">蓝图</p>
+          <p class="resident__desc">蓝色系 · 1/1200 的传说，出生记见《养殖场参观记》</p>
+        </div>
       </div>
     </div>
 
@@ -124,6 +146,48 @@ import { SITE } from '../config';
     padding: 26px 30px;
   }
 
+  .residents {
+    padding: 26px 30px;
+  }
+
+  .residents h2 {
+    margin-bottom: 4px;
+  }
+
+  .residents__hint {
+    color: var(--text-muted);
+    font-size: 14.5px;
+    margin-bottom: 18px;
+  }
+
+  .residents__grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+
+  .resident {
+    text-align: center;
+    padding: 14px 10px;
+    background: var(--surface-2);
+    border: var(--border-w) solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+
+  .resident__name {
+    margin: 6px 0 2px;
+    font-family: var(--font-display);
+    font-size: 17px;
+    color: var(--text);
+  }
+
+  .resident__desc {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
   .about-site p,
   .contact p {
     color: var(--text-muted);
@@ -140,6 +204,10 @@ import { SITE } from '../config';
 
   @media (max-width: 720px) {
     .grid {
+      grid-template-columns: 1fr;
+    }
+
+    .residents__grid {
       grid-template-columns: 1fr;
     }
   }
