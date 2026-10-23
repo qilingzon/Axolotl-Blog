@@ -1,0 +1,32 @@
+---
+import { SITE } from '../config';
+import Axolotl from './Axolotl.astro';
+
+const pathname = Astro.url.pathname.replace(/\/$/, '') || '/';
+const isActive = (href: string) => {
+  const clean = href.replace(/\/$/, '') || '/';
+  return clean === '/' ? pathname === '/' : pathname.startsWith(clean);
+};
+---
+
+<header class="site-header">
+  <div class="container site-header__inner">
+    <a href="/" class="site-logo">
+      <Axolotl variant="purple" :size="30" simplified />
+      <span>{SITE.name}</span>
+    </a>
+    <nav class="site-nav" aria-label="主导航">
+      {
+        SITE.nav.map((item) => (
+          <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
+            {item.label}
+          </a>
+        ))
+      }
+    </nav>
+    <button id="theme-switcher" class="theme-switcher" type="button" aria-label="切换主题" title="切换主题">
+      <span class="theme-switcher__dot" aria-hidden="true"></span>
+      <span class="theme-switcher__name">粉螈·奶油</span>
+    </button>
+  </div>
+</header>

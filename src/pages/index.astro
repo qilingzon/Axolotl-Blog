@@ -1,15 +1,259 @@
 ---
-// 占位首页 —— 阶段 4 会替换为正式设计
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Axolotl from '../components/Axolotl.astro';
+import PostCard from '../components/PostCard.astro';
+import { getCollection } from 'astro:content';
+import { SITE } from '../config';
+
+const posts = (await getCollection('blog'))
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
+  .slice(0, 3);
 ---
 
-<!doctype html>
-<html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>美西螈池塘</title>
-  </head>
-  <body>
-    <h1>美西螈池塘 · 脚手架占位页</h1>
-  </body>
-</html>
+<BaseLayout>
+  <section class="hero">
+    <div class="container hero__inner">
+      <div class="hero__text">
+        <p class="hero__eyebrow">{SITE.nameEn}</p>
+        <h1 class="hero__title">{SITE.name}</h1>
+        <p class="hero__sub">一只紫螈和一只粉螈守护的个人博客。</p>
+        <p class="hero__desc">
+          写代码、写字，也写像素世界的小事。池塘不大，但一直有活水。
+        </p>
+        <div class="hero__actions">
+          <a class="btn" href="/blog/">去逛文章</a>
+          <a class="btn btn--ghost" href="/about/">认识两只螈</a>
+        </div>
+      </div>
+      <div class="hero__art" aria-hidden="true">
+        <span class="bubble bubble--1"></span>
+        <span class="bubble bubble--2"></span>
+        <span class="bubble bubble--3"></span>
+        <span class="bubble bubble--4"></span>
+        <Axolotl variant="pink" mode="swim" size={230} class="hero__swim" />
+        <Axolotl variant="purple" mode="face" size={132} class="hero__face" />
+      </div>
+    </div>
+  </section>
+
+  <section class="container latest">
+    <div class="latest__head">
+      <h2>最近更新</h2>
+      <a href="/blog/">全部文章 →</a>
+    </div>
+    <div class="latest__grid">
+      {posts.map((post) => <PostCard post={post} />)}
+    </div>
+  </section>
+
+  <section class="container theme-tip">
+    <div class="card theme-tip__card">
+      <Axolotl variant="purple" mode="face" size={40} />
+      <p>
+        这个博客有三套皮肤：<strong>粉螈·奶油</strong>、<strong>紫螈·像素</strong> 和
+        <strong>荧光洞窟</strong>。点右上角的按钮换着看看？
+      </p>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .hero {
+    padding: 56px 0 40px;
+    background: linear-gradient(180deg, var(--bg-soft) 0%, var(--bg) 100%);
+    overflow: hidden;
+    transition: background 0.35s ease;
+  }
+
+  .hero__inner {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+  }
+
+  .hero__text {
+    flex: 1.1;
+    min-width: 0;
+  }
+
+  .hero__eyebrow {
+    font-family: var(--font-display);
+    font-size: 14px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+
+  .hero__title {
+    font-size: clamp(38px, 6vw, 58px);
+    margin: 0 0 10px;
+  }
+
+  .hero__sub {
+    font-size: 19px;
+    margin-bottom: 6px;
+  }
+
+  .hero__desc {
+    color: var(--text-muted);
+    margin-bottom: 26px;
+  }
+
+  .hero__actions {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .hero__art {
+    position: relative;
+    flex: 0.9;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 18px;
+    min-height: 200px;
+  }
+
+  .hero__swim {
+    animation: float-y 4.5s ease-in-out infinite;
+  }
+
+  .hero__face {
+    animation: float-y 3.6s ease-in-out infinite reverse;
+  }
+
+  .latest {
+    padding: 36px 24px 0;
+  }
+
+  .latest__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+
+  .latest__head h2 {
+    margin: 0;
+    font-size: 26px;
+  }
+
+  .latest__head a {
+    font-family: var(--font-display);
+    font-size: 15px;
+  }
+
+  .latest__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+  }
+
+  .theme-tip {
+    padding: 28px 24px 0;
+  }
+
+  .theme-tip__card {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 18px 24px;
+    color: var(--text-muted);
+  }
+
+  .theme-tip__card p {
+    margin: 0;
+  }
+
+  .theme-tip__card strong {
+    color: var(--text);
+  }
+
+  @keyframes float-y {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  .bubble {
+    position: absolute;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    opacity: 0.45;
+    animation: bubble-rise 7s linear infinite;
+  }
+
+  .bubble--1 {
+    width: 14px;
+    height: 14px;
+    left: 12%;
+    bottom: -20px;
+    animation-delay: 0s;
+  }
+
+  .bubble--2 {
+    width: 9px;
+    height: 9px;
+    left: 38%;
+    bottom: -20px;
+    animation-delay: 2.2s;
+  }
+
+  .bubble--3 {
+    width: 18px;
+    height: 18px;
+    left: 60%;
+    bottom: -20px;
+    animation-delay: 4s;
+    border-color: var(--accent-2);
+  }
+
+  .bubble--4 {
+    width: 8px;
+    height: 8px;
+    left: 84%;
+    bottom: -20px;
+    animation-delay: 5.4s;
+    border-color: var(--accent-2);
+  }
+
+  @keyframes bubble-rise {
+    0% {
+      transform: translateY(0) scale(0.9);
+      opacity: 0;
+    }
+    12% {
+      opacity: 0.5;
+    }
+    100% {
+      transform: translateY(-220px) scale(1.05);
+      opacity: 0;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .hero__inner {
+      flex-direction: column-reverse;
+      gap: 10px;
+    }
+
+    .hero__art {
+      min-height: 130px;
+    }
+
+    .hero__swim :global(svg),
+    .hero__art > :global(svg) {
+      width: auto;
+    }
+
+    .hero {
+      padding-top: 30px;
+    }
+  }
+</style>

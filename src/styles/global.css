@@ -1,0 +1,512 @@
+/* ============================================================
+   美西螈池塘 · 全局样式
+   三主题：pink-soft（默认）/ purple-pixel / lumen-cave
+   通过 <html data-theme="..."> 切换；变量驱动 + 结构性覆盖
+   ============================================================ */
+
+/* ---------- 主题变量 ---------- */
+
+/* 粉螈·奶油：现代柔和风（默认，写在 :root） */
+:root,
+[data-theme='pink-soft'] {
+  --bg: #fdf4f8;
+  --bg-soft: #fae8f1;
+  --surface: #ffffff;
+  --surface-2: #fcf0f6;
+  --text: #472b3d;
+  --text-muted: #9c7186;
+  --accent: #ee6fa7;
+  --accent-2: #9b5de5;
+  --accent-text: #ffffff;
+  --border: #f2d4e2;
+  --border-w: 1px;
+  --radius: 20px;
+  --radius-sm: 12px;
+  --shadow: 0 6px 24px rgba(238, 111, 167, 0.12);
+  --shadow-hard: none;
+  --glow: none;
+  --font-display: 'Fusion Pixel 12px Proportional SC', system-ui, 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  --font-body: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei',
+    'Segoe UI', sans-serif;
+  --header-bg: rgba(253, 244, 248, 0.85);
+  color-scheme: light;
+}
+
+/* 紫螈·像素：Minecraft 像素方块风 */
+[data-theme='purple-pixel'] {
+  --bg: #ede8fa;
+  --bg-soft: #e2daf5;
+  --surface: #fbfaff;
+  --surface-2: #f0ebfc;
+  --text: #33265c;
+  --text-muted: #6f5fa8;
+  --accent: #7c4dff;
+  --accent-2: #f06ba8;
+  --accent-text: #ffffff;
+  --border: #33265c;
+  --border-w: 3px;
+  --radius: 0;
+  --radius-sm: 0;
+  --shadow: 4px 4px 0 #33265c;
+  --shadow-hard: 4px 4px 0 #33265c;
+  --glow: none;
+  --font-display: 'Fusion Pixel 12px Proportional SC', system-ui, 'PingFang SC',
+    'Microsoft YaHei', monospace;
+  --font-body: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei',
+    'Segoe UI', sans-serif;
+  --header-bg: rgba(237, 232, 250, 0.92);
+  color-scheme: light;
+}
+
+/* 荧光洞窟：繁茂洞穴深色夜读 */
+[data-theme='lumen-cave'] {
+  --bg: #14102b;
+  --bg-soft: #1b1638;
+  --surface: #1f1940;
+  --surface-2: #272052;
+  --text: #eae6ff;
+  --text-muted: #9c93c8;
+  --accent: #c77dff;
+  --accent-2: #ff8fc7;
+  --accent-text: #1a1130;
+  --border: #322a63;
+  --border-w: 1px;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.38);
+  --shadow-hard: none;
+  --glow: 0 0 18px rgba(199, 125, 255, 0.4);
+  --font-display: 'Fusion Pixel 12px Proportional SC', system-ui, 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  --font-body: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei',
+    'Segoe UI', sans-serif;
+  --header-bg: rgba(20, 16, 43, 0.85);
+  color-scheme: dark;
+}
+
+/* ---------- Reset 与基础 ---------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.75;
+  color: var(--text);
+  background-color: var(--bg);
+  transition: background-color 0.35s ease, color 0.35s ease;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  flex: 1;
+  width: 100%;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  line-height: 1.4;
+  margin: 0 0 0.5em;
+  letter-spacing: 0.02em;
+}
+
+p {
+  margin: 0 0 1em;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: var(--accent-2);
+  text-decoration: underline;
+}
+
+img,
+svg {
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent-2);
+  outline-offset: 2px;
+}
+
+/* ---------- 布局 ---------- */
+
+.container {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ---------- 顶栏 ---------- */
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--header-bg);
+  backdrop-filter: blur(12px);
+  border-bottom: var(--border-w) solid var(--border);
+  transition: background-color 0.35s ease, border-color 0.35s ease;
+}
+
+.site-header__inner {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-height: 64px;
+}
+
+.site-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.site-logo:hover {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.site-nav {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.site-nav a {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-size: 15px;
+}
+
+.site-nav a:hover {
+  color: var(--accent);
+  background: var(--surface-2);
+  text-decoration: none;
+}
+
+.site-nav a[aria-current='page'] {
+  color: var(--accent-text);
+  background: var(--accent);
+}
+
+/* ---------- 主题切换按钮 ---------- */
+
+.theme-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--text);
+  background: var(--surface);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-hard);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.theme-switcher:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.theme-switcher:active {
+  transform: translate(2px, 2px);
+}
+
+.theme-switcher__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: var(--glow);
+}
+
+/* ---------- 页脚 ---------- */
+
+.site-footer {
+  margin-top: 64px;
+  padding: 28px 0;
+  border-top: var(--border-w) solid var(--border);
+  background: var(--bg-soft);
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+  transition: background-color 0.35s ease, border-color 0.35s ease;
+}
+
+.site-footer p {
+  margin: 4px 0;
+}
+
+/* ---------- 卡片 ---------- */
+
+.card {
+  background: var(--surface);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+a.card {
+  display: block;
+  color: inherit;
+}
+
+a.card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  text-decoration: none;
+  box-shadow: var(--shadow), var(--glow);
+}
+
+/* ---------- 标签 ---------- */
+
+.tag {
+  display: inline-block;
+  padding: 2px 12px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: var(--accent);
+  background: var(--surface-2);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- 按钮 ---------- */
+
+.btn {
+  display: inline-block;
+  padding: 10px 24px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--accent-text);
+  background: var(--accent);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-hard);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.btn:hover {
+  color: var(--accent-text);
+  text-decoration: none;
+  filter: brightness(1.08);
+}
+
+.btn:active {
+  transform: translate(2px, 2px);
+}
+
+.btn--ghost {
+  color: var(--accent);
+  background: transparent;
+  border-color: var(--accent);
+  box-shadow: none;
+}
+
+.btn--ghost:hover {
+  color: var(--accent-text);
+  background: var(--accent);
+}
+
+/* ---------- 像素主题结构性覆盖 ---------- */
+
+[data-theme='purple-pixel'] .site-header {
+  backdrop-filter: none;
+}
+
+[data-theme='purple-pixel'] a.card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--border);
+}
+
+[data-theme='purple-pixel'] .theme-switcher,
+[data-theme='purple-pixel'] .btn,
+[data-theme='purple-pixel'] .tag {
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+[data-theme='purple-pixel'] .site-nav a[aria-current='page'] {
+  box-shadow: 2px 2px 0 var(--border);
+}
+
+/* 像素主题下 SVG 保持硬边 */
+[data-theme='purple-pixel'] svg {
+  shape-rendering: crispEdges;
+}
+
+/* ---------- 荧光洞窟覆盖 ---------- */
+
+[data-theme='lumen-cave'] h1,
+[data-theme='lumen-cave'] h2,
+[data-theme='lumen-cave'] h3 {
+  text-shadow: var(--glow);
+}
+
+[data-theme='lumen-cave'] .site-logo,
+[data-theme='lumen-cave'] .site-nav a[aria-current='page'] {
+  text-shadow: var(--glow);
+}
+
+/* ---------- 文章排版（Markdown 渲染） ---------- */
+
+.prose {
+  max-width: 72ch;
+}
+
+.prose h2 {
+  margin-top: 1.8em;
+  font-size: 1.5em;
+}
+
+.prose h3 {
+  margin-top: 1.5em;
+  font-size: 1.22em;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.6em;
+  margin: 0 0 1em;
+}
+
+.prose li {
+  margin-bottom: 0.35em;
+}
+
+.prose blockquote {
+  margin: 1.2em 0;
+  padding: 0.6em 1.2em;
+  border-left: 4px solid var(--accent);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+
+.prose blockquote p {
+  margin: 0;
+}
+
+.prose code {
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 0.9em;
+  padding: 0.15em 0.45em;
+  background: var(--surface-2);
+  border-radius: 6px;
+}
+
+.prose pre {
+  padding: 18px 20px;
+  overflow-x: auto;
+  background: var(--surface-2);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-sm);
+  line-height: 1.6;
+}
+
+.prose pre code {
+  padding: 0;
+  background: none;
+}
+
+.prose img {
+  border-radius: var(--radius-sm);
+  border: var(--border-w) solid var(--border);
+}
+
+.prose hr {
+  border: none;
+  border-top: var(--border-w) dashed var(--border);
+  margin: 2.4em 0;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.2em 0;
+  font-size: 0.95em;
+}
+
+.prose th,
+.prose td {
+  border: var(--border-w) solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.prose th {
+  background: var(--surface-2);
+  font-family: var(--font-display);
+}
+
+/* ---------- 响应式 ---------- */
+
+@media (max-width: 720px) {
+  .site-header__inner {
+    gap: 10px;
+    min-height: 56px;
+  }
+
+  .site-logo {
+    font-size: 17px;
+  }
+
+  .site-nav a {
+    padding: 5px 8px;
+    font-size: 14px;
+  }
+
+  .theme-switcher {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .theme-switcher__name {
+    display: none;
+  }
+
+  .container {
+    padding: 0 16px;
+  }
+}

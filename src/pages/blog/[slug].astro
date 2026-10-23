@@ -1,0 +1,144 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Axolotl from '../../components/Axolotl.astro';
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog');
+  const sorted = posts.sort(
+    (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+  );
+  return sorted.map((post, i) => ({
+    params: { slug: post.id },
+    props: { post, prev: sorted[i - 1] ?? null, next: sorted[i + 1] ?? null },
+  }));
+}
+
+const { post, prev, next } = Astro.props;
+const { Content } = await render(post);
+const { title, description, pubDate, tags, accent } = post.data;
+const dateStr = pubDate.toLocaleDateString('zh-CN', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+---
+
+<BaseLayout title={title} description={description}>
+  <article class="container post">
+    <header class="post__head">
+      <a class="post__back" href="/blog/">← 全部文章</a>
+      <h1 class="post__title">{title}</h1>
+      <div class="post__meta">
+        <Axolotl variant={accent} mode="face" size={36} />
+        <time datetime={pubDate.toISOString()}>{dateStr}</time>
+        {
+          tags.length > 0 && (
+            <div class="post__tags">
+              {tags.map((t) => (
+                <span class="tag">{t}</span>
+              ))}
+            </div>
+          )
+        }
+      </div>
+    </header>
+    <div class="prose post__body">
+      <Content />
+    </div>
+    <nav class="post__nav">
+      {
+        prev ? (
+          <a class="card post__nav-item" href={`/blog/${prev.id}/`}>
+            <span class="post__nav-label">上一篇</span>
+            <span>{prev.data.title}</span>
+          </a>
+        ) : (
+          <span />
+        )
+      }
+      {
+        next ? (
+          <a class="card post__nav-item post__nav-item--next" href={`/blog/${next.id}/`}>
+            <span class="post__nav-label">下一篇</span>
+            <span>{next.data.title}</span>
+          </a>
+        ) : (
+          <span />
+        )
+      }
+    </nav>
+  </article>
+</BaseLayout>
+
+<style>
+  .post {
+    max-width: 800px;
+    padding: 40px 24px 0;
+  }
+
+  .post__back {
+    font-family: var(--font-display);
+    font-size: 14px;
+  }
+
+  .post__title {
+    font-size: clamp(28px, 5vw, 40px);
+    margin: 12px 0 14px;
+  }
+
+  .post__meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    color: var(--text-muted);
+    font-family: var(--font-display);
+    font-size: 14px;
+    padding-bottom: 22px;
+    border-bottom: var(--border-w) dashed var(--border);
+    margin-bottom: 30px;
+  }
+
+  .post__tags {
+    display: flex;
+    gap: 6px;
+  }
+
+  .post__body {
+    margin: 0 auto;
+  }
+
+  .post__nav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 52px 0 0;
+    padding-bottom: 8px;
+  }
+
+  .post__nav-item {
+    padding: 16px 20px;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--text);
+  }
+
+  .post__nav-item--next {
+    text-align: right;
+  }
+
+  .post__nav-label {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 12.5px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  @media (max-width: 720px) {
+    .post__nav {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

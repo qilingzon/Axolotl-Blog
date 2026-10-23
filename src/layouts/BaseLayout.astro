@@ -1,0 +1,79 @@
+---
+import '@fontsource/fusion-pixel-12px-proportional-sc/400.css';
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { SITE, THEMES, THEME_STORAGE_KEY } from '../config';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const { title, description = SITE.description } = Astro.props;
+const pageTitle = title ? `${title} · ${SITE.name}` : `${SITE.name} · ${SITE.nameEn}`;
+---
+
+<!doctype html>
+<html lang="zh-CN" data-theme="pink-soft">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script is:inline>
+      // 防闪烁：首帧前从 localStorage 恢复主题
+      (function () {
+        try {
+          var t = localStorage.getItem('axo-theme');
+          if (t) document.documentElement.dataset.theme = t;
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <Header />
+    <main>
+      <slot />
+    </main>
+    <Footer />
+    <script is:inline define:vars={{ THEMES, THEME_STORAGE_KEY }}>
+      // 主题循环切换（事件委托，全站生效）
+      (function () {
+        var themes = THEMES;
+        function currentTheme() {
+          return (
+            themes.find(function (t) {
+              return t.id === document.documentElement.dataset.theme;
+            }) || themes[0]
+          );
+        }
+        function updateSwitcher() {
+          var btn = document.getElementById('theme-switcher');
+          if (!btn) return;
+          var cur = currentTheme();
+          btn.querySelector('.theme-switcher__dot').style.background = cur.dot;
+          var name = btn.querySelector('.theme-switcher__name');
+          if (name) name.textContent = cur.label;
+        }
+        document.addEventListener('click', function (e) {
+          var btn = e.target.closest('#theme-switcher');
+          if (!btn) return;
+          var ids = themes.map(function (t) {
+            return t.id;
+          });
+          var next = ids[(ids.indexOf(currentTheme().id) + 1) % ids.length];
+          document.documentElement.dataset.theme = next;
+          try {
+            localStorage.setItem(THEME_STORAGE_KEY, next);
+          } catch (err) {}
+          updateSwitcher();
+        });
+        document.addEventListener('astro:after-swap', updateSwitcher);
+        updateSwitcher();
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,146 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Axolotl from '../components/Axolotl.astro';
+import { SITE } from '../config';
+---
+
+<BaseLayout title="关于" description={`关于${SITE.name}和它的两位主人。`}>
+  <section class="container page">
+    <header class="page__head">
+      <h1>关于池塘</h1>
+      <p>两只美西螈，一个小池塘。</p>
+    </header>
+
+    <div class="grid">
+      <div class="card profile">
+        <Axolotl variant="purple" mode="face" size={96} class="profile__avatar" />
+        <h2>紫螈</h2>
+        <p class="profile__role">技术担当 · 像素紫</p>
+        <ul>
+          <li>负责博客里所有带代码块的文章</li>
+          <li>口头禅：「这能用 CSS 变量解决」</li>
+          <li>梦想是刷出一只蓝色美西螈（进度 0/1200）</li>
+        </ul>
+      </div>
+      <div class="card profile">
+        <Axolotl variant="pink" mode="face" size={96} class="profile__avatar" />
+        <h2>粉螈</h2>
+        <p class="profile__role">生活担当 · 奶油粉</p>
+        <ul>
+          <li>负责读书、随笔和一切没有代码的内容</li>
+          <li>口头禅：「这个可以写得可爱一点」</li>
+          <li>像素画自学中，代表作就是本站 logo</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card about-site">
+      <h2>关于这个站点</h2>
+      <p>
+        {SITE.name}（{SITE.nameEn}）是一个用
+        <a href="https://astro.build" target="_blank" rel="noopener">Astro</a>
+        搭建的纯静态博客，灵感来自 Minecraft 里的美西螈。整站没有一张位图图片——两只吉祥物都是手绘字符矩阵转成的 SVG。
+      </p>
+      <p>
+        右上角可以切换三套主题：<strong>粉螈·奶油</strong>（柔和现代）、<strong>紫螈·像素</strong>（方块复古）、<strong>荧光洞窟</strong>（深色夜读）。你的选择会被记住。
+      </p>
+    </div>
+
+    <div class="card contact">
+      <h2>找到我们</h2>
+      <p>池塘没有留言板，但欢迎通过这些方式丢鱼桶过来：</p>
+      <ul>
+        <li>邮箱：hello@axolotl-pond.example.com</li>
+        <li>GitHub：github.com/axolotl-pond</li>
+      </ul>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .page {
+    padding: 44px 24px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .page__head h1 {
+    font-size: 36px;
+    margin-bottom: 2px;
+  }
+
+  .page__head p {
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .profile {
+    padding: 28px;
+    text-align: center;
+  }
+
+  .profile__avatar {
+    margin-bottom: 8px;
+  }
+
+  .profile h2 {
+    margin-bottom: 2px;
+  }
+
+  .profile__role {
+    font-family: var(--font-display);
+    font-size: 13.5px;
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
+
+  .profile ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    text-align: left;
+    color: var(--text-muted);
+    font-size: 14.5px;
+  }
+
+  .profile li {
+    padding: 6px 0;
+    border-top: var(--border-w) dashed var(--border);
+  }
+
+  .profile li:first-child {
+    border-top: none;
+  }
+
+  .about-site,
+  .contact {
+    padding: 26px 30px;
+  }
+
+  .about-site p,
+  .contact p {
+    color: var(--text-muted);
+  }
+
+  .about-site strong {
+    color: var(--text);
+  }
+
+  .contact ul {
+    margin: 0;
+    color: var(--text-muted);
+  }
+
+  @media (max-width: 720px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

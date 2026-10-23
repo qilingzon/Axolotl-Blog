@@ -1,0 +1,48 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Axolotl from '../components/Axolotl.astro';
+---
+
+<BaseLayout title="迷路了" description="页面不存在——一只美西螈在洞穴里迷路了。">
+  <section class="container lost">
+    <Axolotl variant="purple" mode="swim" size={180} class="lost__art" />
+    <h1 class="lost__code">404</h1>
+    <p>这只美西螈在洞穴里迷路了，页面也是。</p>
+    <a class="btn" href="/">带回池塘</a>
+  </section>
+</BaseLayout>
+
+<style>
+  .lost {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 80px 24px 0;
+  }
+
+  .lost__art {
+    animation: lost-float 4s ease-in-out infinite;
+  }
+
+  .lost__code {
+    font-size: 56px;
+    margin: 12px 0 0;
+    color: var(--accent);
+  }
+
+  .lost p {
+    color: var(--text-muted);
+    margin-bottom: 26px;
+  }
+
+  @keyframes lost-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-12px);
+    }
+  }
+</style>
