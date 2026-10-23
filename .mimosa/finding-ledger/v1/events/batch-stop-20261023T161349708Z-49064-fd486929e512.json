@@ -1,0 +1,141 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20261023T161349708Z-49064-fd486929e512",
+  "runId": "20261023T161349708Z-49064-fd486929e512",
+  "runStatus": "inconclusive",
+  "coverage": {
+    "status": "partial",
+    "reasons": [
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": "package-lock.json",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".astro/content.d.ts",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".astro/types.d.ts",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": "package-lock.json",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".astro/content.d.ts",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".astro/types.d.ts",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      }
+    ]
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "5ac8b4901ac4b48a41d959c7a7c1ea7d0bafb87a",
+  "diffHash": "45edbc5d8673e56f70feca2c98153724cef1ce9172a4db6573291c7306a2583f",
+  "rulesVersion": "unavailable",
+  "sessionHash": "4e9fb982349d982c92323ef867fda797c76f2fe8f49f24770846f94cb127d887",
+  "reportRef": ".mimosa/reports/task-review-session_525068c1be63144f73c4467647e628f8-20261023T161349708Z-49064-fd486929e512.json",
+  "events": [
+    {
+      "eventId": "hook-89d0e147dbb94cc9286d9621909bcef3",
+      "findingId": "mimosa-5f95a5b157255145c0221704",
+      "type": "finding_observed",
+      "at": "2026-10-23T16:13:49.708Z",
+      "identity": {
+        "projectRelativeFile": "package.json",
+        "ruleId": "mimosa.supply.version-range",
+        "codeEvidenceHash": "226c8b6d53462331c6837ba1962a6a9da17a35403d5817b2b3088ed5a4b23eaa",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 12,
+      "endLine": 12,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "226c8b6d53462331c6837ba1962a6a9da17a35403d5817b2b3088ed5a4b23eaa"
+      },
+      "sequence": 0
+    },
+    {
+      "eventId": "hook-04386d20e597bf7ccc73bc46af771d99",
+      "findingId": "mimosa-debf10d20d51838b8079d2ef",
+      "type": "finding_observed",
+      "at": "2026-10-23T16:13:49.708Z",
+      "identity": {
+        "projectRelativeFile": "package.json",
+        "ruleId": "mimosa.supply.version-range",
+        "codeEvidenceHash": "4249a66cd2048ce77597850cf970c6c62dd35666898c1b10592b120d0bfb272e",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 13,
+      "endLine": 13,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "4249a66cd2048ce77597850cf970c6c62dd35666898c1b10592b120d0bfb272e"
+      },
+      "sequence": 1
+    }
+  ],
+  "observedFindingIds": [],
+  "verifiedFiles": [
+    {
+      "file": "backup.sh",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "src/config.ts",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "src/content.config.ts",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": ".astro/content.d.ts",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": ".astro/types.d.ts",
+      "direct": "complete",
+      "projectContext": "partial"
+    }
+  ],
+  "recordedAt": "2026-10-23T16:13:50.116Z"
+}

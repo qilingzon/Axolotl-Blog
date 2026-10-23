@@ -1,126 +1,41 @@
 ---
 /**
- * 像素美西螈组件：矩阵转 <rect>，合并同色横段。
- * 矩阵字符：B 主体 / G 鳃 / E 眼 / W 眼白 / C 腮红 / D 嘴·深色 / L 肚皮
+ * 美西螈吉祥物组件：形象取自 Axolotl Launcher（桌面启动器）的应用图标，
+ * 粉色为原图，紫色变体用 CSS 色相旋转实时生成。
+ * 资源：public/assets/axolotl-launcher.png（256×191，透明背景）
  */
 interface Props {
   variant?: 'pink' | 'purple';
   size?: number;
+  /** 兼容旧 API（face/swim），现在两种模式都用同一头像图 */
   mode?: 'face' | 'swim';
+  class?: string;
 }
 
-const { variant = 'pink', size = 64, mode = 'face' } = Astro.props;
+const { variant = 'pink', size = 64, class: className } = Astro.props;
 
-const palettes = {
-  pink: {
-    body: '#F9A8C9',
-    gill: '#F5538F',
-    eye: '#33202E',
-    white: '#FFFFFF',
-    cheek: '#F27BA8',
-    dark: '#C94F80',
-    belly: '#FDD7E6',
-  },
-  purple: {
-    body: '#9B7BD4',
-    gill: '#7C4DFF',
-    eye: '#241A3D',
-    white: '#FFFFFF',
-    cheek: '#C9A9F2',
-    dark: '#6C4BC4',
-    belly: '#D6C8F2',
-  },
-} as const;
-
-type Ch = 'B' | 'G' | 'E' | 'W' | 'C' | 'D' | 'L';
-
-const sprites: Record<'face' | 'swim', string[]> = {
-  // 正面头像 16×13
-  face: [
-    '..G..........G..',
-    '.G.G........G.G.',
-    '.G.G..BBBB..G.G.',
-    'G.G..BBBBBB..G.G',
-    'G.BBBBBBBBBBBB.G',
-    '..BBEWBBBBWEBB..',
-    '..BBBBBBBBBBBB..',
-    '..BCBBBBBBBBCB..',
-    '...BBBBBBBBBB...',
-    '...BBDBBBBDBB...',
-    '...BBBBDDBBBB...',
-    '...LLLLLLLLLL...',
-    '....LLLLLLLL....',
-  ],
-  // 侧身游泳 32×14（朝右）
-  swim: [
-    '........................G..G....',
-    '.......................G..G.....',
-    '........................G..G....',
-    '........................GBBG....',
-    '.......................BBBBBB...',
-    '..............BBBBBBBBBBBBBBB..',
-    '..........BBBBBBBBBBBBBBBBEBBB..',
-    '......BBBBBBBBBBBBBBBBBBBBBBB..',
-    '.BBBBBBBBBBBBBBBBBBBBBBBBBBBD..',
-    'BBBBBBBBBBBBBBBBBBBBBBBBBBBBDB..',
-    '......LLLLLLLLLLLLLLLLBBBBBBB..',
-    '............LLLLLLLLLL.LLLLLL...',
-    '...........BB..........BB.......',
-    '...........B...........B........',
-  ],
-};
-
-const c = palettes[variant];
-const colorMap: Record<Ch, string> = {
-  B: c.body,
-  G: c.gill,
-  E: c.eye,
-  W: c.white,
-  C: c.cheek,
-  D: c.dark,
-  L: c.belly,
-};
-
-const rows = sprites[mode];
-const w = rows[0].length;
-const h = rows.length;
-const rects: { x: number; y: number; w: number; fill: string }[] = [];
-
-rows.forEach((row, y) => {
-  let run: { ch: Ch | null; start: number } = { ch: null, start: 0 };
-  for (let x = 0; x <= row.length; x++) {
-    const ch = (row[x] ?? '.') as Ch | '.';
-    if (ch !== run.ch) {
-      if (run.ch && run.ch !== '.') {
-        rects.push({ x: run.start, y, w: x - run.start, fill: colorMap[run.ch] });
-      }
-      run = { ch: ch === '.' ? null : ch, start: x };
-    }
-  }
-});
-
+const src = '/assets/axolotl-launcher.png';
 const label = variant === 'pink' ? '粉色美西螈' : '紫色美西螈';
 ---
 
-<svg
+<img
+  src={src}
+  alt={label}
   width={size}
-  height={Math.round((size * h) / w)}
-  viewBox={`0 0 ${w} ${h}`}
-  shape-rendering="crispEdges"
-  role="img"
-  aria-label={label}
-  class="axolotl"
->
-  {
-    rects.map((r) => (
-      <rect x={r.x} y={r.y} width={r.w} height={1} fill={r.fill} />
-    ))
-  }
-</svg>
+  height={Math.round((size * 191) / 256)}
+  class:list={['axolotl', variant === 'purple' && 'axolotl--purple', className]}
+  loading="lazy"
+  decoding="async"
+/>
 
 <style>
   .axolotl {
     display: inline-block;
     vertical-align: middle;
+    height: auto;
+  }
+
+  .axolotl--purple {
+    filter: hue-rotate(-55deg) saturate(1.08);
   }
 </style>

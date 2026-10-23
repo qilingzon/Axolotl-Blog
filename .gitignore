@@ -3,6 +3,9 @@ dist/
 # generated types
 .astro/
 
+# 启动器美术提取中间产物（最终资源已固化到 public/assets/）
+design-assets/
+
 # dependencies
 node_modules/
 

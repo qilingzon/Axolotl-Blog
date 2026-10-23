@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "mimosa-finding-history/v1",
+  "runId": "20261023T161349708Z-49064-fd486929e512",
+  "runStatus": "inconclusive",
+  "errors": [
+    "baseline-read:package-lock.json: baseline_snapshot_unreadable: file is missing from task baseline",
+    "baseline-read:.astro/content.d.ts: baseline_snapshot_unreadable: file is missing from task baseline",
+    "baseline-read:.astro/types.d.ts: baseline_snapshot_unreadable: file is missing from task baseline"
+  ],
+  "target": ".",
+  "revision": "5ac8b4901ac4b48a41d959c7a7c1ea7d0bafb87a",
+  "diffHash": "45edbc5d8673e56f70feca2c98153724cef1ce9172a4db6573291c7306a2583f",
+  "rulesVersion": "unavailable",
+  "recordedAt": "2026-10-23T16:13:49.708Z",
+  "timing": {
+    "startedAt": "2026-10-23T16:13:47.258Z",
+    "completedAt": "2026-10-23T16:13:49.708Z",
+    "durationMs": 2450
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "modelCalls": 0,
+    "measurement": "known-zero"
+  },
+  "findings": {
+    "total": 2,
+    "bySeverity": {
+      "low": 2
+    },
+    "byStatus": {
+      "candidate": 2
+    }
+  },
+  "coverage": {
+    "status": "partial",
+    "reasonCounts": {
+      "baseline_snapshot_unreadable": 3,
+      "project_check_failed": 3
+    }
+  },
+  "evidenceBoundary": "static_only",
+  "immutableReport": ".mimosa/reports/task-review-session_525068c1be63144f73c4467647e628f8-20261023T161349708Z-49064-fd486929e512.json"
+}
