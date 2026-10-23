@@ -23,18 +23,88 @@ const pageTitle = title ? `${title} · ${SITE.name}` : `${SITE.name} · ${SITE.n
     <title>{pageTitle}</title>
     <meta name="description" content={description} />
     <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preload" as="image" href="/assets/axolotl-launcher.png" />
     <script is:inline>
       // 防闪烁：首帧前确定主题。?theme= 参数优先于 localStorage（用于分享带主题的链接），不写入存储。
+      // 同时决定加载界面：会话内只展示一次；展示哪只美西螈由主题映射（lumen-cave 每次随机）。
       (function () {
+        var t = 'pink-soft';
         try {
-          var t = new URLSearchParams(location.search).get('theme');
-          if (!t) t = localStorage.getItem('axo-theme');
-          if (t) document.documentElement.dataset.theme = t;
+          t = new URLSearchParams(location.search).get('theme') || localStorage.getItem('axo-theme') || 'pink-soft';
         } catch (e) {}
+        if (t !== 'pink-soft' && t !== 'purple-pixel' && t !== 'lumen-cave') t = 'pink-soft';
+        document.documentElement.dataset.theme = t;
+        var seen = null;
+        try {
+          seen = sessionStorage.getItem('axo-splash-seen');
+        } catch (e) {}
+        if (seen) document.documentElement.classList.add('no-splash');
+        var map = { 'pink-soft': 'pink', 'purple-pixel': 'purple' };
+        document.documentElement.dataset.splash = map[t] || (Math.random() < 0.5 ? 'pink' : 'purple');
       })();
     </script>
   </head>
   <body>
+    <div id="splash" class="splash" aria-hidden="true">
+      <div class="splash__inner">
+        <div class="splash__pond">
+          <span class="splash__bubble splash__bubble--1"></span>
+          <span class="splash__bubble splash__bubble--2"></span>
+          <span class="splash__bubble splash__bubble--3"></span>
+          <img
+            class="splash__axolotl splash__axolotl--pink"
+            src="/assets/axolotl-launcher.png"
+            alt=""
+            width="150"
+            height="112"
+          />
+          <img
+            class="splash__axolotl splash__axolotl--purple axolotl--purple"
+            src="/assets/axolotl-launcher.png"
+            alt=""
+            width="150"
+            height="112"
+          />
+        </div>
+        <div class="splash__bar"><i></i></div>
+        <p class="splash__text">正在游向池塘</p>
+      </div>
+    </div>
+    <script is:inline>
+      // 加载界面：load 后至少展示 0.7s 再淡出；本会话不再重复；3s 兜底强退。
+      (function () {
+        var el = document.getElementById('splash');
+        if (!el) return;
+        if (document.documentElement.classList.contains('no-splash')) {
+          el.remove();
+          return;
+        }
+        var t0 = Date.now();
+        var done = false;
+        function hide() {
+          if (done) return;
+          done = true;
+          el.classList.add('splash--out');
+          try {
+            sessionStorage.setItem('axo-splash-seen', '1');
+          } catch (e) {}
+          setTimeout(function () {
+            el.remove();
+          }, 450);
+        }
+        function ready() {
+          var min =
+            matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 700;
+          setTimeout(hide, Math.max(0, min - (Date.now() - t0)));
+        }
+        if (document.readyState === 'complete') ready();
+        else window.addEventListener('load', ready);
+        setTimeout(hide, 3000);
+        window.addEventListener('pageshow', function (e) {
+          if (e.persisted) hide();
+        });
+      })();
+    </script>
     <Header />
     <main>
       <slot />

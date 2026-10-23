@@ -480,6 +480,210 @@ a.card:hover {
   font-family: var(--font-display);
 }
 
+/* ---------- 美西螈图片通用 ---------- */
+
+/* 紫色变体：同一张粉色原图，CSS 色相旋转生成 */
+.axolotl--purple {
+  filter: hue-rotate(-55deg) saturate(1.08);
+}
+
+.axolotl {
+  display: inline-block;
+  vertical-align: middle;
+  height: auto;
+}
+
+/* ---------- 加载界面（splash） ----------
+   首帧前由 <head> 内联脚本决定：
+   - html.no-splash        本会话已看过，整层不渲染
+   - html[data-splash=pink|purple] 展示哪只美西螈 */
+
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  transition: opacity 0.4s ease;
+}
+
+.no-splash .splash {
+  display: none;
+}
+
+.splash--out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.splash__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+}
+
+.splash__pond {
+  position: relative;
+  width: 190px;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.splash__axolotl {
+  display: none;
+  width: 150px;
+  animation: splash-bob 2.2s ease-in-out infinite;
+}
+
+[data-splash='pink'] .splash__axolotl--pink {
+  display: block;
+}
+
+[data-splash='purple'] .splash__axolotl--purple {
+  display: block;
+}
+
+.splash__bubble {
+  position: absolute;
+  bottom: 6px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  opacity: 0;
+  animation: splash-rise 2.6s linear infinite;
+}
+
+.splash__bubble--1 {
+  width: 12px;
+  height: 12px;
+  left: 26px;
+}
+
+.splash__bubble--2 {
+  width: 8px;
+  height: 8px;
+  left: 96px;
+  border-color: var(--accent-2);
+  animation-delay: 0.9s;
+}
+
+.splash__bubble--3 {
+  width: 15px;
+  height: 15px;
+  left: 146px;
+  animation-delay: 1.7s;
+}
+
+.splash__bar {
+  width: 232px;
+  height: 16px;
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-hard);
+  overflow: hidden;
+}
+
+.splash__bar i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--accent) 0 10px,
+    transparent 10px 16px
+  );
+  animation: splash-blocks 1.4s steps(14) infinite;
+}
+
+.splash__text {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--text-muted);
+}
+
+.splash__text::after {
+  content: '';
+  animation: splash-dots 1.2s steps(1) infinite;
+}
+
+@keyframes splash-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-12px) rotate(3deg);
+  }
+}
+
+@keyframes splash-rise {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translateY(-110px);
+    opacity: 0;
+  }
+}
+
+@keyframes splash-blocks {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 224px 0;
+  }
+}
+
+@keyframes splash-dots {
+  0% {
+    content: '';
+  }
+  25% {
+    content: ' ·';
+  }
+  50% {
+    content: ' · ·';
+  }
+  75% {
+    content: ' · · ·';
+  }
+}
+
+@media (max-width: 720px) {
+  .splash__pond {
+    width: 140px;
+    height: 116px;
+  }
+
+  .splash__axolotl {
+    width: 116px;
+  }
+
+  .splash__bar {
+    width: 180px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash__axolotl,
+  .splash__bubble,
+  .splash__bar i,
+  .splash__text::after {
+    animation: none;
+  }
+}
+
 /* ---------- 响应式 ---------- */
 
 @media (max-width: 720px) {
