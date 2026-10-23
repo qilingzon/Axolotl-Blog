@@ -1,11 +1,10 @@
 ---
 /**
- * 美西螈吉祥物组件：形象取自 Axolotl Launcher（桌面启动器）的应用图标。
- * 五个色系（对应 Minecraft 美西螈变体）全部由 CSS 滤镜从粉色原图生成：
- * pink 粉 / purple 紫 / cyan 青 / gold 金 / blue 蓝
- * 资源：public/assets/axolotl-launcher.png（256×191，透明背景）
+ * 美西螈吉祥物组件：形象取自 Axolotl Launcher（桌面启动器）的应用图标，
+ * 全家族色变体由 scripts/generate-variants.mjs 按官方色板重上色生成：
+ * pink=lucy 粉（启动器原图）/ purple 紫（站点二创）/ wild 棕 / cyan 青 / gold 金 / blue 蓝（后四者为 Minecraft 官方色板）
  */
-type Variant = 'pink' | 'purple' | 'cyan' | 'gold' | 'blue';
+type Variant = 'pink' | 'purple' | 'wild' | 'cyan' | 'gold' | 'blue';
 
 interface Props {
   variant?: Variant;
@@ -17,10 +16,18 @@ interface Props {
 
 const { variant = 'pink', size = 64, class: className } = Astro.props;
 
-const src = '/assets/axolotl-launcher.png';
+const srcs: Record<Variant, string> = {
+  pink: '/assets/axolotl-launcher.png',
+  purple: '/assets/axolotl-purple.png',
+  wild: '/assets/axolotl-wild.png',
+  cyan: '/assets/axolotl-cyan.png',
+  gold: '/assets/axolotl-gold.png',
+  blue: '/assets/axolotl-blue.png',
+};
 const labels: Record<Variant, string> = {
   pink: '粉色美西螈',
   purple: '紫色美西螈',
+  wild: '野生色美西螈',
   cyan: '青色美西螈',
   gold: '金色美西螈',
   blue: '蓝色美西螈',
@@ -28,11 +35,11 @@ const labels: Record<Variant, string> = {
 ---
 
 <img
-  src={src}
+  src={srcs[variant]}
   alt={labels[variant]}
   width={size}
   height={Math.round((size * 191) / 256)}
-  class:list={['axolotl', variant !== 'pink' && `axolotl--${variant}`, className]}
+  class:list={['axolotl', className]}
   loading="lazy"
   decoding="async"
 />

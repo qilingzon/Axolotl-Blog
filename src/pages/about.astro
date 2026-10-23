@@ -36,7 +36,9 @@ import { SITE } from '../config';
 
     <div class="card residents">
       <h2>池塘住民</h2>
-      <p class="residents__hint">除了两位博主，池塘里还住着这些家伙（对，全家都是 Minecraft 色系）：</p>
+      <p class="residents__hint">
+        除了两位博主，池塘里还住着这些家伙——配色全部采样自 Minecraft 官方贴图：
+      </p>
       <div class="residents__grid">
         <div class="resident">
           <Axolotl variant="cyan" size={72} />
@@ -47,6 +49,11 @@ import { SITE } from '../config';
           <Axolotl variant="gold" size={72} />
           <p class="resident__name">焦糖</p>
           <p class="resident__desc">金色系 · 干饭担当，热带鱼桶第一个下嘴的总是它</p>
+        </div>
+        <div class="resident">
+          <Axolotl variant="wild" size={72} />
+          <p class="resident__name">栗子</p>
+          <p class="resident__desc">野生色系 · 池塘前辈，据说是从繁茂洞穴一路游来的</p>
         </div>
         <div class="resident">
           <Axolotl variant="blue" size={72} />
@@ -162,7 +169,7 @@ import { SITE } from '../config';
 
   .residents__grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 18px;
   }
 
@@ -200,6 +207,12 @@ import { SITE } from '../config';
   .contact ul {
     margin: 0;
     color: var(--text-muted);
+  }
+
+  @media (max-width: 900px) {
+    .residents__grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
   }
 
   @media (max-width: 720px) {
