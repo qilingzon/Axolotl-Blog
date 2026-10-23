@@ -7,8 +7,8 @@
 /* ---------- 主题变量 ---------- */
 
 /* 粉螈·奶油：现代柔和风（默认，写在 :root） */
-:root,
-[data-theme='pink-soft'] {
+:root[data-theme='pink-soft'],
+:root:not([data-theme]) {
   --bg: #fdf4f8;
   --bg-soft: #fae8f1;
   --surface: #ffffff;
@@ -34,7 +34,7 @@
 }
 
 /* 紫螈·像素：Minecraft 像素方块风 */
-[data-theme='purple-pixel'] {
+:root[data-theme='purple-pixel'] {
   --bg: #ede8fa;
   --bg-soft: #e2daf5;
   --surface: #fbfaff;
@@ -60,7 +60,7 @@
 }
 
 /* 荧光洞窟：繁茂洞穴深色夜读 */
-[data-theme='lumen-cave'] {
+:root[data-theme='lumen-cave'] {
   --bg: #14102b;
   --bg-soft: #1b1638;
   --surface: #1f1940;

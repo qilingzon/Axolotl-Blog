@@ -24,10 +24,11 @@ const pageTitle = title ? `${title} · ${SITE.name}` : `${SITE.name} · ${SITE.n
     <meta name="description" content={description} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script is:inline>
-      // 防闪烁：首帧前从 localStorage 恢复主题
+      // 防闪烁：首帧前确定主题。?theme= 参数优先于 localStorage（用于分享带主题的链接），不写入存储。
       (function () {
         try {
-          var t = localStorage.getItem('axo-theme');
+          var t = new URLSearchParams(location.search).get('theme');
+          if (!t) t = localStorage.getItem('axo-theme');
           if (t) document.documentElement.dataset.theme = t;
         } catch (e) {}
       })();
