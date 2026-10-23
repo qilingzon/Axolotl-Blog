@@ -37,13 +37,14 @@ import { SITE } from '../config';
     <div class="card residents">
       <h2>池塘住民</h2>
       <p class="residents__hint">
-        除了两位博主，池塘里还住着这些家伙——配色全部采样自 Minecraft 官方贴图：
+        除了两位博主，池塘里还住着这些家伙——五只配色采样自 Minecraft
+        官方贴图，还有一只来自被砍掉的预告片：
       </p>
       <div class="residents__grid">
         <div class="resident">
           <Axolotl variant="cyan" size={72} />
           <p class="resident__name">汽水</p>
-          <p class="resident__desc">青色系 · 泡泡爱好者，喜欢趴在气泡柱上看风景</p>
+          <p class="resident__desc">青色系 · 蓝身体粉鳃的官方配色，泡泡爱好者</p>
         </div>
         <div class="resident">
           <Axolotl variant="gold" size={72} />
@@ -59,6 +60,11 @@ import { SITE } from '../config';
           <Axolotl variant="blue" size={72} />
           <p class="resident__name">蓝图</p>
           <p class="resident__desc">蓝色系 · 1/1200 的传说，出生记见《养殖场参观记》</p>
+        </div>
+        <div class="resident">
+          <Axolotl variant="green" size={72} />
+          <p class="resident__name">抹茶</p>
+          <p class="resident__desc">绿色系 · 预告片限定，在正式版被砍掉前逃进了池塘</p>
         </div>
       </div>
     </div>
@@ -169,8 +175,8 @@ import { SITE } from '../config';
 
   .residents__grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 18px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
   }
 
   .resident {

@@ -8,8 +8,8 @@ const blog = defineCollection({
     description: z.string(),
     pubDate: z.coerce.date(),
     tags: z.array(z.string()).default([]),
-    /** 卡片装饰美西螈的颜色（五个色系对应 Minecraft 美西螈变体） */
-    accent: z.enum(['pink', 'purple', 'cyan', 'gold', 'blue']).default('pink'),
+    /** 卡片装饰美西螈的颜色（六色：Minecraft 官方五色 + 站点二创紫） */
+    accent: z.enum(['pink', 'purple', 'wild', 'cyan', 'gold', 'blue']).default('pink'),
   }),
 });
 

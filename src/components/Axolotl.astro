@@ -2,9 +2,10 @@
 /**
  * 美西螈吉祥物组件：形象取自 Axolotl Launcher（桌面启动器）的应用图标，
  * 全家族色变体由 scripts/generate-variants.mjs 按官方色板重上色生成：
- * pink=lucy 粉（启动器原图）/ purple 紫（站点二创）/ wild 棕 / cyan 青 / gold 金 / blue 蓝（后四者为 Minecraft 官方色板）
+ * pink=lucy 粉（启动器原图）/ purple 紫（站点二创）/ wild 棕 / cyan 青（粉鳃）/ gold 金 / blue 蓝（官方色板）
+ * / green 绿（Minecraft Live 2020 预告片展示后被砍的变体，彩蛋成员）
  */
-type Variant = 'pink' | 'purple' | 'wild' | 'cyan' | 'gold' | 'blue';
+type Variant = 'pink' | 'purple' | 'wild' | 'cyan' | 'gold' | 'blue' | 'green';
 
 interface Props {
   variant?: Variant;
@@ -23,6 +24,7 @@ const srcs: Record<Variant, string> = {
   cyan: '/assets/axolotl-cyan.png',
   gold: '/assets/axolotl-gold.png',
   blue: '/assets/axolotl-blue.png',
+  green: '/assets/axolotl-green.png',
 };
 const labels: Record<Variant, string> = {
   pink: '粉色美西螈',
@@ -31,6 +33,7 @@ const labels: Record<Variant, string> = {
   cyan: '青色美西螈',
   gold: '金色美西螈',
   blue: '蓝色美西螈',
+  green: '绿色美西螈',
 };
 ---
 

@@ -2,7 +2,7 @@
 
 > 领域特有规则写在这里。通用纪律见用户级 `~/.zcode/AGENTS.md`（事实源判定/回合纪律/重试熔断/破坏性操作确认/验收即宪法/git 纪律/备份），对所有项目自动生效。
 
-- 美西螈吉祥物组件（`src/components/Axolotl.astro`）是全站视觉核心：粉色为 Axolotl Launcher 应用图标原图（`public/assets/axolotl-launcher.png`，用户指定），其余五色变体（紫二创 / wild 棕 / cyan 青 / gold 金 / blue 蓝）由 `node scripts/generate-variants.mjs` 按官方贴图采样色板重上色生成——改色先改脚本里的 RAMPS 再重新生成，不要手改位图、不要再引入 CSS 滤镜方案。改动需同时检查三个主题（pink-soft / purple-pixel / lumen-cave）下的呈现。
+- 美西螈吉祥物组件（`src/components/Axolotl.astro`）是全站视觉核心：粉色为 Axolotl Launcher 应用图标原图（`public/assets/axolotl-launcher.png`，用户指定），其余六色变体（紫二创 / wild 棕 / cyan 青·粉鳃 / gold 金 / blue 蓝 / green 预告片彩蛋）由 `node scripts/generate-variants.mjs` 按官方贴图采样色板重上色生成——改色先改脚本里的 RAMPS 再重新生成，不要手改位图、不要引入 CSS 滤镜方案。改动需同时检查三个主题（pink-soft / purple-pixel / lumen-cave）下的呈现。
 - 除吉祥物资源外，站点零外部图片依赖：其余美术一律内联 SVG/CSS，新增图片资源需先征得同意。
 - 主题切换必须持久化（localStorage），且 `<head>` 内联引导脚本防闪烁逻辑不能移除。
 - 所有视觉改动完成后必须开 preview 截图过目（3 主题 × 关键页），截图作为验收证据。
