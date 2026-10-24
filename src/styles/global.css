@@ -488,9 +488,10 @@ a.card:hover {
   height: auto;
 }
 
-/* ---------- 每次访问随机的美西螈（hero 双螈） ----------
-   html[data-hero-big/small] 由 <head> 引导脚本首帧前随机写入；
-   停留期间颜色稳定，刷新/再次进站重新随机 */
+/* ---------- 每次访问随机的美西螈（header / hero 双螈 / 提示条 / 页脚双螈） ----------
+   容器 .axo-pick--<slot> 内七张变体图同位叠加；
+   <head> 引导脚本首帧前注入一条 <style>：隐藏该槽位全部、点亮随机命中的一只。
+   槽位登记在 BaseLayout.astro 引导脚本里；无 JS 时兜底显示粉螈 */
 
 .axo-pick {
   position: relative;
@@ -509,29 +510,6 @@ a.card:hover {
 
 /* 无脚本兜底：粉螈可见 */
 .axo-pick__img--pink {
-  opacity: 1;
-}
-
-/* 随机结果存在时先全部隐藏，再点亮命中的那只 */
-html[data-hero-big] .axo-pick--hero-big .axo-pick__img,
-html[data-hero-small] .axo-pick--hero-small .axo-pick__img {
-  opacity: 0;
-}
-
-html[data-hero-big='pink'] .axo-pick--hero-big .axo-pick__img--pink,
-html[data-hero-big='purple'] .axo-pick--hero-big .axo-pick__img--purple,
-html[data-hero-big='wild'] .axo-pick--hero-big .axo-pick__img--wild,
-html[data-hero-big='cyan'] .axo-pick--hero-big .axo-pick__img--cyan,
-html[data-hero-big='gold'] .axo-pick--hero-big .axo-pick__img--gold,
-html[data-hero-big='blue'] .axo-pick--hero-big .axo-pick__img--blue,
-html[data-hero-big='green'] .axo-pick--hero-big .axo-pick__img--green,
-html[data-hero-small='pink'] .axo-pick--hero-small .axo-pick__img--pink,
-html[data-hero-small='purple'] .axo-pick--hero-small .axo-pick__img--purple,
-html[data-hero-small='wild'] .axo-pick--hero-small .axo-pick__img--wild,
-html[data-hero-small='cyan'] .axo-pick--hero-small .axo-pick__img--cyan,
-html[data-hero-small='gold'] .axo-pick--hero-small .axo-pick__img--gold,
-html[data-hero-small='blue'] .axo-pick--hero-small .axo-pick__img--blue,
-html[data-hero-small='green'] .axo-pick--hero-small .axo-pick__img--green {
   opacity: 1;
 }
 

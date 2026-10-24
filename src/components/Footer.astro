@@ -1,15 +1,15 @@
 ---
 import { SITE } from '../config';
-import Axolotl from './Axolotl.astro';
+import AxolotlRandom from './AxolotlRandom.astro';
 const year = new Date().getFullYear();
 ---
 
 <footer class="site-footer">
   <div class="container">
     <p>
-      <Axolotl variant="pink" :size="22" simplified />
-      <Axolotl variant="purple" :size="22" simplified />
-      © {year} {SITE.name} · 由一只紫螈和一只粉螈共同守护
+      <AxolotlRandom slotName="footer-a" size={22} />
+      <AxolotlRandom slotName="footer-b" size={22} />
+      © {year} {SITE.name} · 由两只随机出没的美西螈共同守护
     </p>
     <p>
       用 <a href="https://astro.build" target="_blank" rel="noopener">Astro</a> 构建 ·

@@ -1,12 +1,12 @@
 ---
 /**
  * 每次访问随机一只美西螈（停留期间颜色稳定不闪）：
- * 七张变体图同位叠加，<head> 引导脚本在首帧前随机写 html[data-hero-big/small]，
- * global.css 按 data 属性只显示对应一只；无 JS 时兜底显示粉螈。
- * slotName 对应引导脚本写入的 data 属性名（hero-big / hero-small）。
+ * 七张变体图同位叠加，<head> 引导脚本（BaseLayout.astro）首帧前注入 <style>，
+ * 隐藏全部并点亮随机命中的一只；无 JS 时兜底显示粉螈。
+ * slotName 需先在引导脚本的槽位登记里注册（如 hero-big / header / footer-a）。
  */
 interface Props {
-  slotName: 'hero-big' | 'hero-small';
+  slotName: string;
   size?: number;
   class?: string;
 }

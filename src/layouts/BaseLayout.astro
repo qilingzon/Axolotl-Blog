@@ -39,13 +39,27 @@ const pageTitle = title ? `${title} · ${SITE.name}` : `${SITE.name} · ${SITE.n
           seen = sessionStorage.getItem('axo-splash-seen');
         } catch (e) {}
         if (seen) document.documentElement.classList.add('no-splash');
-        // 首页 hero 双螈：每次访问随机两只（颜色必不同），停留期间保持稳定
+        // 各处美西螈每次访问随机一只（停留期间稳定）：成对位两只颜色必不同。
+        // 新增随机螈位时在 slots 里登记，容器用 <AxolotlRandom slotName="..."> 渲染
         var V = ['pink', 'purple', 'wild', 'cyan', 'gold', 'blue', 'green'];
-        var bi = Math.floor(Math.random() * 7);
-        var sj = Math.floor(Math.random() * 6);
-        if (sj >= bi) sj++;
-        document.documentElement.dataset.heroBig = V[bi];
-        document.documentElement.dataset.heroSmall = V[sj];
+        var css = '';
+        function solo(slot) {
+          css += '.axo-pick--' + slot + ' .axo-pick__img{opacity:0}.axo-pick--' + slot + ' .axo-pick__img--' + V[Math.floor(Math.random() * 7)] + '{opacity:1}';
+        }
+        function pair(a, b) {
+          var i = Math.floor(Math.random() * 7);
+          var j = Math.floor(Math.random() * 6);
+          if (j >= i) j++;
+          css += '.axo-pick--' + a + ' .axo-pick__img{opacity:0}.axo-pick--' + a + ' .axo-pick__img--' + V[i] + '{opacity:1}';
+          css += '.axo-pick--' + b + ' .axo-pick__img{opacity:0}.axo-pick--' + b + ' .axo-pick__img--' + V[j] + '{opacity:1}';
+        }
+        pair('hero-big', 'hero-small');
+        solo('header');
+        solo('tip');
+        pair('footer-a', 'footer-b');
+        var st = document.createElement('style');
+        st.textContent = css;
+        document.head.appendChild(st);
       })();
     </script>
   </head>

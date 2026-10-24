@@ -1,6 +1,6 @@
 ---
 import { SITE } from '../config';
-import Axolotl from './Axolotl.astro';
+import AxolotlRandom from './AxolotlRandom.astro';
 
 const pathname = Astro.url.pathname.replace(/\/$/, '') || '/';
 const isActive = (href: string) => {
@@ -12,7 +12,7 @@ const isActive = (href: string) => {
 <header class="site-header">
   <div class="container site-header__inner">
     <a href="/" class="site-logo">
-      <Axolotl variant="purple" :size="30" simplified />
+      <AxolotlRandom slotName="header" size={30} />
       <span>{SITE.name}</span>
     </a>
     <nav class="site-nav" aria-label="主导航">

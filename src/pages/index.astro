@@ -1,6 +1,5 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import Axolotl from '../components/Axolotl.astro';
 import AxolotlRandom from '../components/AxolotlRandom.astro';
 import PostCard from '../components/PostCard.astro';
 import { getCollection } from 'astro:content';
@@ -17,7 +16,7 @@ const posts = (await getCollection('blog'))
       <div class="hero__text">
         <p class="hero__eyebrow">{SITE.nameEn}</p>
         <h1 class="hero__title">{SITE.name}</h1>
-        <p class="hero__sub">一只紫螈和一只粉螈守护的个人博客。</p>
+        <p class="hero__sub">两只随机出没的美西螈，守护的个人博客。</p>
         <p class="hero__desc">
           写代码、写字，也写像素世界的小事。池塘不大，但一直有活水。
         </p>
@@ -53,7 +52,7 @@ const posts = (await getCollection('blog'))
 
   <section class="container theme-tip">
     <div class="card theme-tip__card">
-      <Axolotl variant="purple" mode="face" size={40} />
+      <AxolotlRandom slotName="tip" size={40} />
       <p>
         这个博客有三套皮肤：<strong>粉螈·奶油</strong>、<strong>紫螈·像素</strong> 和
         <strong>荧光洞窟</strong>。点右上角的按钮换着看看？
