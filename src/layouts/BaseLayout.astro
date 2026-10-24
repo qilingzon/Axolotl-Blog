@@ -39,6 +39,13 @@ const pageTitle = title ? `${title} · ${SITE.name}` : `${SITE.name} · ${SITE.n
           seen = sessionStorage.getItem('axo-splash-seen');
         } catch (e) {}
         if (seen) document.documentElement.classList.add('no-splash');
+        // 首页 hero 双螈：每次访问随机两只（颜色必不同），停留期间保持稳定
+        var V = ['pink', 'purple', 'wild', 'cyan', 'gold', 'blue', 'green'];
+        var bi = Math.floor(Math.random() * 7);
+        var sj = Math.floor(Math.random() * 6);
+        if (sj >= bi) sj++;
+        document.documentElement.dataset.heroBig = V[bi];
+        document.documentElement.dataset.heroSmall = V[sj];
       })();
     </script>
   </head>

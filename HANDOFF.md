@@ -9,6 +9,8 @@
   - wiki 核对结论（minecraft.wiki）：官方五色 = lucy 粉 / wild 棕 / gold 金 / cyan 青·**粉鳃** / blue 蓝（gold 是正式变体非废案）；唯一未进游戏的官方色是 **green 绿**（Minecraft Live 2020 预告片后被砍）→ 已作为彩蛋成员加入
   - 七色家族：pink=启动器原图；purple 紫二创；wild/cyan/gold/blue 采样自 1.18.jar 官方贴图（cyan 用鳃部独立色带还原粉鳃）；green 手调色板。生成器 `scripts/generate-variants.mjs` 支持 `gill` 色带。展示位：关于页住民五只（汽水/焦糖/栗子/蓝图/抹茶）、404 七只、文章卡片 accent 轮换、加载层粉/紫
   - 加载界面（splash）：七色美西螈轮换——七张变体图同位叠加，纯 CSS 交叉淡入（周期 2.8s、每色槽 0.4s）+ 摆尾 + 水泡 + 方块进度条 + 「正在游向池塘」；**每张图的 cycle 负延迟对准自己色槽淡入完成的时刻**，渲染时钟被节流冻结时也恰有一只完整可见（IAB 遮挡面板会冻结动画时钟，这是踩过的坑）；load 后最少展示 0.7s 淡出（3s 兜底，prefers-reduced-motion 停轮换只显粉螈）；sessionStorage `axo-splash-seen` 会话内只展示一次
+  - hero 双螈（首页）：**每次访问随机两只、停留期间颜色稳定**——`<head>` 引导脚本首帧前随机写 `html[data-hero-big/small]`（两只必不同色），global.css 按 data 属性点亮对应一张；无 JS 兜底粉螈。曾做过连续轮换版（AxolotlCycle）被用户否决（"闪来闪去看瞎眼"），组件已删，勿回退
+  - 踩坑：Astro 组件里 `<style set:html={...}>` 不会输出（插值 style 不支持），动态规则要写 global.css 或 `<style is:inline>`
   - 吉祥物来源：Axolotl Launcher（D:\AxolotlLauncher）应用图标，`PrivateExtractIcons` 提取 256×256 版本，裁掉透明边距后放 `public/assets/axolotl-launcher.png`（256×191）；紫色变体 = CSS `hue-rotate(-55deg)`，无独立位图
   - 提取中间产物在 design-assets/（已 gitignore）：75 张 webp 是启动器内嵌的群系悬浮岛图标（与美西螈无关），JPEG 是 UI 截图，唯一美西螈形象就是 exe 图标
 - 下一步：可选扩展——RSS、标签页、评论系统、"繁茂洞穴"绿色主题

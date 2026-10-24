@@ -488,6 +488,53 @@ a.card:hover {
   height: auto;
 }
 
+/* ---------- 每次访问随机的美西螈（hero 双螈） ----------
+   html[data-hero-big/small] 由 <head> 引导脚本首帧前随机写入；
+   停留期间颜色稳定，刷新/再次进站重新随机 */
+
+.axo-pick {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.axo-pick__img {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+
+/* 无脚本兜底：粉螈可见 */
+.axo-pick__img--pink {
+  opacity: 1;
+}
+
+/* 随机结果存在时先全部隐藏，再点亮命中的那只 */
+html[data-hero-big] .axo-pick--hero-big .axo-pick__img,
+html[data-hero-small] .axo-pick--hero-small .axo-pick__img {
+  opacity: 0;
+}
+
+html[data-hero-big='pink'] .axo-pick--hero-big .axo-pick__img--pink,
+html[data-hero-big='purple'] .axo-pick--hero-big .axo-pick__img--purple,
+html[data-hero-big='wild'] .axo-pick--hero-big .axo-pick__img--wild,
+html[data-hero-big='cyan'] .axo-pick--hero-big .axo-pick__img--cyan,
+html[data-hero-big='gold'] .axo-pick--hero-big .axo-pick__img--gold,
+html[data-hero-big='blue'] .axo-pick--hero-big .axo-pick__img--blue,
+html[data-hero-big='green'] .axo-pick--hero-big .axo-pick__img--green,
+html[data-hero-small='pink'] .axo-pick--hero-small .axo-pick__img--pink,
+html[data-hero-small='purple'] .axo-pick--hero-small .axo-pick__img--purple,
+html[data-hero-small='wild'] .axo-pick--hero-small .axo-pick__img--wild,
+html[data-hero-small='cyan'] .axo-pick--hero-small .axo-pick__img--cyan,
+html[data-hero-small='gold'] .axo-pick--hero-small .axo-pick__img--gold,
+html[data-hero-small='blue'] .axo-pick--hero-small .axo-pick__img--blue,
+html[data-hero-small='green'] .axo-pick--hero-small .axo-pick__img--green {
+  opacity: 1;
+}
+
 /* ---------- 加载界面（splash） ----------
    首帧前由 <head> 内联脚本决定：
    - html.no-splash        本会话已看过，整层不渲染

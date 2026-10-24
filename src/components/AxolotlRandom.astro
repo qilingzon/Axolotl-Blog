@@ -1,0 +1,43 @@
+---
+/**
+ * 每次访问随机一只美西螈（停留期间颜色稳定不闪）：
+ * 七张变体图同位叠加，<head> 引导脚本在首帧前随机写 html[data-hero-big/small]，
+ * global.css 按 data 属性只显示对应一只；无 JS 时兜底显示粉螈。
+ * slotName 对应引导脚本写入的 data 属性名（hero-big / hero-small）。
+ */
+interface Props {
+  slotName: 'hero-big' | 'hero-small';
+  size?: number;
+  class?: string;
+}
+
+const { slotName, size = 64, class: className } = Astro.props;
+
+const variants = ['pink', 'purple', 'wild', 'cyan', 'gold', 'blue', 'green'] as const;
+const files: Record<(typeof variants)[number], string> = {
+  pink: '/assets/axolotl-launcher.png',
+  purple: '/assets/axolotl-purple.png',
+  wild: '/assets/axolotl-wild.png',
+  cyan: '/assets/axolotl-cyan.png',
+  gold: '/assets/axolotl-gold.png',
+  blue: '/assets/axolotl-blue.png',
+  green: '/assets/axolotl-green.png',
+};
+const height = Math.round((size * 191) / 256);
+---
+
+<div class:list={['axo-pick', `axo-pick--${slotName}`, className]} style={`width:${size}px;height:${height}px;`}>
+  {
+    variants.map((v) => (
+      <img
+        class={`axo-pick__img axo-pick__img--${v}`}
+        src={files[v]}
+        alt=""
+        width={size}
+        height={height}
+        loading="lazy"
+        decoding="async"
+      />
+    ))
+  }
+</div>

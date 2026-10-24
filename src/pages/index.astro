@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Axolotl from '../components/Axolotl.astro';
-import AxolotlCycle from '../components/AxolotlCycle.astro';
+import AxolotlRandom from '../components/AxolotlRandom.astro';
 import PostCard from '../components/PostCard.astro';
 import { getCollection } from 'astro:content';
 import { SITE } from '../config';
@@ -32,10 +32,10 @@ const posts = (await getCollection('blog'))
         <span class="bubble bubble--3"></span>
         <span class="bubble bubble--4"></span>
         <div class="hero__swim">
-          <AxolotlCycle size={230} />
+          <AxolotlRandom slotName="hero-big" size={230} />
         </div>
         <div class="hero__face">
-          <AxolotlCycle size={132} phase={1.4} />
+          <AxolotlRandom slotName="hero-small" size={132} />
         </div>
       </div>
     </div>
