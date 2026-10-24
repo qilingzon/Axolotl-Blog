@@ -33,6 +33,7 @@
 - IAB `tab.screenshot()` 可能反复 surface preparation timeout：改用系统 Edge 无头截图（见上）。
 - **看图链路**：Read 本地图片 → CDN URL 带未编码路径（坏）；可行链路 = `nodeRepl.emitImage(本地字节)` → 拿干净 CDN URL → `analyze_image` 分析。image-vision 的 config.json 已修 base_url 拼写（minnimax→api.minimax）+ model 换 MiniMax-VL-01，但 key 401，**待用户自查**。
 - PowerShell 数组字面量 `@(@(a,b),...)` 会被展平、函数返回数组会被管道展开——HSL 逐像素变换别用 PowerShell 写，用 CSS filter 或 node。
+- **preview 服务器别用后台 Bash 任务跑**（stdin 关闭后 astro preview 会静默退出，exit 1 且日志无错误）；用 `nohup npx astro preview --port 4321 > preview.log 2>&1 &`（前台调用里脱离运行，已验证稳定）。
 - WebView2 (EBWebView) 的 Default/Cache 里可能没有 UI 图片缓存，别指望从那里挖资源。
 
 ## 其他
