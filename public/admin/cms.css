@@ -591,6 +591,22 @@ select:focus {
   border-color: var(--accent);
 }
 
+.md-toolbar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+.md-toolbar__sep {
+  display: inline-block;
+  width: 1px;
+  height: 18px;
+  margin: 0 6px;
+  vertical-align: middle;
+  background: var(--border);
+}
+
 .split {
   display: grid;
   grid-template-columns: 1fr 1fr;

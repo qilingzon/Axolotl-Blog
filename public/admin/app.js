@@ -558,6 +558,9 @@ function renderEditor(slug) {
         '</div>' +
         '<div class="card">' +
         '<div class="md-toolbar" id="md-tools">' +
+        '<button type="button" data-hist="undo" title="回退（Ctrl+Z）" disabled>↩ 回退</button>' +
+        '<button type="button" data-hist="redo" title="恢复（Ctrl+Y）" disabled>↪ 恢复</button>' +
+        '<span class="md-toolbar__sep"></span>' +
         mdBtn('H2', '标题', '## ', '') + mdBtn('H3', '小标题', '### ', '') +
         mdBtn('B', '加粗', '**', '**') + mdBtn('I', '斜体', '*', '*') +
         mdBtn('链接', '插入链接', '[', '](https://)') +
@@ -597,10 +600,78 @@ function bindEditor(origSlug, post) {
   var pvThemes = ['pink-soft', 'purple-pixel', 'lumen-cave'];
   var pvIdx = 0;
 
+  var ta = $('#f-body');
+
+  // ---------- 回退/恢复：自管历史栈（输入/工具栏插入统一可撤销） ----------
+  var hist = [{ v: ta.value, s: 0, e: 0 }];
+  var histIdx = 0;
+  var histTimer = null;
+  var undoBtn = $('#md-tools button[data-hist=undo]');
+  var redoBtn = $('#md-tools button[data-hist=redo]');
+
+  function syncHistButtons() {
+    undoBtn.disabled = histIdx <= 0;
+    redoBtn.disabled = histIdx >= hist.length - 1;
+  }
+
+  function pushHist() {
+    clearTimeout(histTimer);
+    var top = hist[hist.length - 1];
+    if (top && top.v === ta.value) {
+      syncHistButtons();
+      return;
+    }
+    hist = hist.slice(0, histIdx + 1);
+    hist.push({ v: ta.value, s: ta.selectionStart, e: ta.selectionEnd });
+    if (hist.length > 200) hist.shift();
+    histIdx = hist.length - 1;
+    syncHistButtons();
+  }
+
+  function stepHist(dir) {
+    var next = histIdx + dir;
+    if (next < 0 || next >= hist.length) return;
+    histIdx = next;
+    var snap = hist[histIdx];
+    ta.value = snap.v;
+    ta.setSelectionRange(snap.s, snap.e);
+    ta.focus();
+    refreshPreview();
+    syncHistButtons();
+  }
+
+  function queueHist() {
+    clearTimeout(histTimer);
+    histTimer = setTimeout(pushHist, 350);
+  }
+
+  undoBtn.addEventListener('click', function () {
+    stepHist(-1);
+  });
+  redoBtn.addEventListener('click', function () {
+    stepHist(1);
+  });
+  ta.addEventListener('keydown', function (e) {
+    var mod = e.ctrlKey || e.metaKey;
+    if (!mod) return;
+    var k = e.key.toLowerCase();
+    if (k === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      stepHist(-1);
+    } else if (k === 'y' || (k === 'z' && e.shiftKey)) {
+      e.preventDefault();
+      stepHist(1);
+    }
+  });
+  syncHistButtons();
+
   function refreshPreview() {
     $('#preview').innerHTML = renderMarkdown($('#f-body').value) || '<p style="color:var(--text-muted)">预览会出现在这里……</p>';
   }
-  $('#f-body').addEventListener('input', refreshPreview);
+  ta.addEventListener('input', function () {
+    queueHist();
+    refreshPreview();
+  });
   refreshPreview();
 
   $('#f-accent').addEventListener('click', function (e) {
@@ -615,12 +686,11 @@ function bindEditor(origSlug, post) {
   $('#md-tools').addEventListener('click', function (e) {
     var btn = e.target.closest('button[data-before]');
     if (!btn) return;
-    var ta = $('#f-body');
-    var s = ta.selectionStart;
     var before = btn.dataset.before.replace(/\\n/g, '\n');
     var after = btn.dataset.after.replace(/\\n/g, '\n');
-    ta.setRangeText(before + after, s, ta.selectionEnd, 'select');
+    ta.setRangeText(before + after, ta.selectionStart, ta.selectionEnd, 'select');
     ta.focus();
+    pushHist();
   });
 
   $('#pv-theme-btn').addEventListener('click', function () {

@@ -12,6 +12,8 @@ const blog = defineCollection({
     accent: z
       .enum(['pink', 'purple', 'wild', 'cyan', 'gold', 'blue', 'green'])
       .default('pink'),
+    /** 草稿：true 时前台（列表/首页/搜索/详情页）不生成 */
+    draft: z.boolean().default(false),
   }),
 });
 

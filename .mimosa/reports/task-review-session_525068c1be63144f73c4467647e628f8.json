@@ -1,113 +1,403 @@
 {
   "schema_version": "mimosa-task-review/v2",
-  "run_id": "20261024T025745315Z-37816-f6aaa463b1cb",
-  "run_status": "inconclusive",
-  "errors": [
-    {
-      "stage": "bash-discovery",
-      "target": ".",
-      "reason": "bash_discovery_incomplete: task baseline unavailable"
-    },
-    {
-      "stage": "baseline",
-      "target": ".",
-      "reason": "baseline_missing: task baseline is unavailable"
-    }
-  ],
+  "run_id": "20261024T161237296Z-54880-ef85b29a9da9",
+  "run_status": "completed",
+  "errors": [],
   "coverage": {
     "schema_version": "mimosa-hook-coverage/v1",
-    "status": "partial",
+    "status": "complete",
     "scope": "hook_observed_diff",
     "baseline": {
-      "complete": false,
-      "captured_files": 0,
-      "candidate_limit": 20,
+      "complete": true,
+      "captured_files": 12,
+      "candidate_limit": 5000,
       "truncated": false,
       "enumeration_error_count": 0,
       "snapshot_error_count": 0,
-      "compensated_target_count": 0
+      "compensated_target_count": 7
     },
     "change_tracking": {
-      "touched_observed": 0,
-      "touched_retained": 0,
+      "touched_observed": 5,
+      "touched_retained": 5,
       "truncated": false,
       "bash_mutation": true,
-      "bash_discovered": 0,
+      "bash_discovered": 7,
       "bash_discovery_limit": 80,
       "bash_discovery_truncated": false
     },
     "candidates": {
-      "eligible_files": 0,
-      "selected_files": 0,
+      "eligible_files": 7,
+      "selected_files": 7,
       "limit": 20,
       "truncated": false
     },
     "scanning": {
-      "required_files": 0,
-      "scanned_files": 0,
+      "required_files": 4,
+      "scanned_files": 4,
       "skipped_files": 0,
       "failed_files": 0,
-      "project_checks_required": 0,
-      "project_checks_completed": 0
+      "project_checks_required": 2,
+      "project_checks_completed": 2
     },
     "notification": {
-      "eligible_findings": 0,
-      "detailed_findings": 0,
+      "eligible_findings": 2,
+      "detailed_findings": 1,
       "detail_limit": 3,
-      "truncated": false
+      "truncated": true
     },
-    "reason_counts": {
-      "bash_discovery_incomplete": 1,
-      "baseline_missing": 1,
-      "project_check_failed": 2
-    },
-    "reasons": [
-      {
-        "code": "bash_discovery_incomplete",
-        "stage": "bash-discovery",
-        "target": ".",
-        "detail": "task baseline unavailable",
-        "affects_completion": true
-      },
-      {
-        "code": "baseline_missing",
-        "stage": "baseline",
-        "target": ".",
-        "detail": "task baseline is unavailable",
-        "affects_completion": true
-      },
-      {
-        "code": "project_check_failed",
-        "stage": "bash-discovery",
-        "target": ".",
-        "detail": "bash_discovery_incomplete: task baseline unavailable",
-        "affects_completion": true
-      },
-      {
-        "code": "project_check_failed",
-        "stage": "baseline",
-        "target": ".",
-        "detail": "baseline_missing: task baseline is unavailable",
-        "affects_completion": true
-      }
-    ],
+    "reason_counts": {},
+    "reasons": [],
     "reasons_truncated": false
   },
-  "generated_at": "2026-10-24T02:57:45.315Z",
+  "generated_at": "2026-10-24T16:12:37.296Z",
   "session_id": "session_525068c1be63144f73c4467647e628f8",
   "target": ".",
-  "revision": "f3a2cee16450e4ecb9567263c8bf2b0dbe41686e",
+  "revision": "294de61821b36948667dda70626ca241a758ed9f",
   "rules_version": "unavailable",
-  "diff_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "diff_hash": "1069cb2d5f4ae331d44cc25f50a1dca674b89a51c485bb19bd48c33f79447c60",
   "diff": {
     "algorithm": "sha256",
-    "changed_file_count": 0,
-    "changed_files": []
+    "changed_file_count": 7,
+    "changed_files": [
+      {
+        "file": "AGENTS.md",
+        "ranges": [
+          {
+            "start": 9,
+            "end": 10
+          }
+        ],
+        "before_hash": "61d7630cc4e0465707bce927766308dd3d3a1a5468f189cd9d951c6d51166383",
+        "after_hash": "191244acaae835b15bb567faf54cb365b410a3f802974ffce8787febdcccbf04"
+      },
+      {
+        "file": "edge-functions/api/[[default]].js",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 500
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "973bae92b301d68b77da6489b311efbfe42a5a24fcb5e3fadc8ad1c27098fdd1"
+      },
+      {
+        "file": "package-lock.json",
+        "ranges": [
+          {
+            "start": 13,
+            "end": 15
+          },
+          {
+            "start": 89,
+            "end": 130
+          },
+          {
+            "start": 164,
+            "end": 197
+          },
+          {
+            "start": 211,
+            "end": 218
+          },
+          {
+            "start": 231,
+            "end": 323
+          },
+          {
+            "start": 1225,
+            "end": 1269
+          },
+          {
+            "start": 1276,
+            "end": 1293
+          },
+          {
+            "start": 1310,
+            "end": 1380
+          },
+          {
+            "start": 1861,
+            "end": 1871
+          },
+          {
+            "start": 1890,
+            "end": 1902
+          },
+          {
+            "start": 2113,
+            "end": 2132
+          },
+          {
+            "start": 2152,
+            "end": 2158
+          },
+          {
+            "start": 2193,
+            "end": 2278
+          },
+          {
+            "start": 2358,
+            "end": 2367
+          },
+          {
+            "start": 2383,
+            "end": 2392
+          },
+          {
+            "start": 2414,
+            "end": 2426
+          },
+          {
+            "start": 2452,
+            "end": 2475
+          },
+          {
+            "start": 2620,
+            "end": 2629
+          },
+          {
+            "start": 2636,
+            "end": 2645
+          },
+          {
+            "start": 2784,
+            "end": 2796
+          },
+          {
+            "start": 2806,
+            "end": 2815
+          },
+          {
+            "start": 2817,
+            "end": 3386
+          },
+          {
+            "start": 3395,
+            "end": 3423
+          },
+          {
+            "start": 3430,
+            "end": 3430
+          },
+          {
+            "start": 3466,
+            "end": 3490
+          },
+          {
+            "start": 3518,
+            "end": 3524
+          },
+          {
+            "start": 3531,
+            "end": 3588
+          },
+          {
+            "start": 3606,
+            "end": 3618
+          },
+          {
+            "start": 3628,
+            "end": 3648
+          },
+          {
+            "start": 3670,
+            "end": 3686
+          },
+          {
+            "start": 3701,
+            "end": 3710
+          },
+          {
+            "start": 3723,
+            "end": 3795
+          },
+          {
+            "start": 3802,
+            "end": 3884
+          },
+          {
+            "start": 3902,
+            "end": 3943
+          },
+          {
+            "start": 4143,
+            "end": 4166
+          },
+          {
+            "start": 4201,
+            "end": 4210
+          },
+          {
+            "start": 4220,
+            "end": 4232
+          },
+          {
+            "start": 4251,
+            "end": 4260
+          },
+          {
+            "start": 4288,
+            "end": 4305
+          },
+          {
+            "start": 4328,
+            "end": 4340
+          },
+          {
+            "start": 4347,
+            "end": 4357
+          },
+          {
+            "start": 4360,
+            "end": 4366
+          },
+          {
+            "start": 4416,
+            "end": 4425
+          },
+          {
+            "start": 4659,
+            "end": 4668
+          },
+          {
+            "start": 5253,
+            "end": 5373
+          },
+          {
+            "start": 5462,
+            "end": 5486
+          },
+          {
+            "start": 5504,
+            "end": 5513
+          },
+          {
+            "start": 5531,
+            "end": 5594
+          },
+          {
+            "start": 5674,
+            "end": 5711
+          },
+          {
+            "start": 5736,
+            "end": 5761
+          },
+          {
+            "start": 5822,
+            "end": 5863
+          },
+          {
+            "start": 5870,
+            "end": 5880
+          },
+          {
+            "start": 6121,
+            "end": 6131
+          },
+          {
+            "start": 6178,
+            "end": 6201
+          },
+          {
+            "start": 6211,
+            "end": 6217
+          },
+          {
+            "start": 6399,
+            "end": 6415
+          },
+          {
+            "start": 6447,
+            "end": 6459
+          },
+          {
+            "start": 6551,
+            "end": 6563
+          },
+          {
+            "start": 6573,
+            "end": 6579
+          },
+          {
+            "start": 6733,
+            "end": 6748
+          },
+          {
+            "start": 6845,
+            "end": 6861
+          },
+          {
+            "start": 7464,
+            "end": 7470
+          },
+          {
+            "start": 7512,
+            "end": 7518
+          },
+          {
+            "start": 7525,
+            "end": 7534
+          },
+          {
+            "start": 7544,
+            "end": 7554
+          }
+        ],
+        "before_hash": "5fa586edeb1fbbf979a078ba1a3c019b6b1b5a92ee6cace1212192c8728b08fa",
+        "after_hash": "1408bd74c4c98ca66ea45e65291f252e6fa3e1d6ae72a8789d6e7c6c9bb02b29"
+      },
+      {
+        "file": "package.json",
+        "ranges": [
+          {
+            "start": 14,
+            "end": 16
+          }
+        ],
+        "before_hash": "a67b149055862b6140eb9c7e8f5d96aa4a7b4117e3507d46fc6aba41f1c281ee",
+        "after_hash": "97d86bd13aba5741c126449dfd35d6780f556992581a07653a36b0b5de6d4f3c"
+      },
+      {
+        "file": "public/admin/app.js",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 867
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "7eaf0937abf570890e2a2585d4fa8a54211c2da80c0b28db33731fa67ab443d9"
+      },
+      {
+        "file": "src/content.config.ts",
+        "ranges": [
+          {
+            "start": 15,
+            "end": 16
+          }
+        ],
+        "before_hash": "b1257cbe5823ba6b7c2c4b483ccd7ee30be2535cd4808be56dc0cabd21c7db61",
+        "after_hash": "b2667c20705bf733e2354d0e633120d38d72292c938ee0b6267c678baec70fef"
+      },
+      {
+        "file": "src/pages/search.json.ts",
+        "ranges": [
+          {
+            "start": 17,
+            "end": 17
+          }
+        ],
+        "before_hash": "aa07385a3f4965e149428d530931d7c66ef721f20eacd5afce7627ca596acc6f",
+        "after_hash": "d994318f65956f3fc16562868edf565c5fe1b14bb8aeecd382eaba24c02f9336"
+      }
+    ]
   },
   "timing": {
-    "started_at": "2026-10-24T02:57:44.764Z",
-    "completed_at": "2026-10-24T02:57:45.315Z",
-    "duration_ms": 551,
+    "started_at": "2026-10-24T16:12:34.895Z",
+    "completed_at": "2026-10-24T16:12:37.296Z",
+    "duration_ms": 2401,
     "measurement": "hook_wall_clock"
   },
   "tokens": {
@@ -121,11 +411,11 @@
     "schemaVersion": "mimosa-gate-telemetry/v1",
     "profile": "gate",
     "operation": "Stop",
-    "outcome": "partial/INCONCLUSIVE",
-    "latencyMs": 551,
-    "peakMemoryBytes": 109441024,
+    "outcome": "complete",
+    "latencyMs": 2401,
+    "peakMemoryBytes": 130375680,
     "memoryMeasurement": "max-observed-process-rss",
-    "scannedFiles": 0,
+    "scannedFiles": 4,
     "cache": {
       "hits": 0,
       "misses": 0,
@@ -140,18 +430,662 @@
       "measurement": "known-zero"
     }
   },
-  "finding_count": 0,
-  "rewake_finding_count": 0,
+  "finding_count": 2,
+  "rewake_finding_count": 1,
   "evidence_boundary": {
     "scan": "candidate",
     "static_fix_verification": "observed_static_only",
     "runtime_verification": "not_performed"
   },
-  "finding_events": [],
-  "findings": [],
+  "finding_events": [
+    {
+      "finding_id": "mimosa-7ed3088d0f40e420a91a4e9b",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 179,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-10-24T15:40:26.593Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "aef11333f29b0be47ae419948fab2c0701a8103968b16a973d8dca700f6ff25f",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-7ed3088d0f40e420a91a4e9b",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 179,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "服务端请求伪造",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-10-24T15:40:26.593Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "aef11333f29b0be47ae419948fab2c0701a8103968b16a973d8dca700f6ff25f",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-11d91165a75d56b3071658e7",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 192,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-10-24T15:40:26.593Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "73af7a91f44eee7c2cab5ee0aa50b1edbe123ee2853ef34d8a4e6be6948a820b",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-11d91165a75d56b3071658e7",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 192,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "服务端请求伪造",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-10-24T15:40:26.593Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "73af7a91f44eee7c2cab5ee0aa50b1edbe123ee2853ef34d8a4e6be6948a820b",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-17c1058e77df41bc2d94fa18",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 195,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-10-24T15:40:26.593Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "211cede9c96d2d1b25d47974cc4f41b7956facf0892d5c55813b4c7f6aa56dd3",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-17c1058e77df41bc2d94fa18",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 195,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "服务端请求伪造",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-10-24T15:40:26.593Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "211cede9c96d2d1b25d47974cc4f41b7956facf0892d5c55813b4c7f6aa56dd3",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-bc46fcae6d81b9e404e150a2",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 233,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-10-24T15:41:36.094Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "a19a21b5af03ffe963d507f4ba4547c2ccb0deb66230b252bee9943f0cfead44",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-bc46fcae6d81b9e404e150a2",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 233,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "服务端请求伪造",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-10-24T15:41:36.094Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "a19a21b5af03ffe963d507f4ba4547c2ccb0deb66230b252bee9943f0cfead44",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-11d91165a75d56b3071658e7",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 252,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-10-24T15:41:36.095Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "73af7a91f44eee7c2cab5ee0aa50b1edbe123ee2853ef34d8a4e6be6948a820b",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-11d91165a75d56b3071658e7",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 252,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "服务端请求伪造",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-10-24T15:41:36.095Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "73af7a91f44eee7c2cab5ee0aa50b1edbe123ee2853ef34d8a4e6be6948a820b",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-17c1058e77df41bc2d94fa18",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 255,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-10-24T15:41:36.095Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "211cede9c96d2d1b25d47974cc4f41b7956facf0892d5c55813b4c7f6aa56dd3",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-17c1058e77df41bc2d94fa18",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 255,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "服务端请求伪造",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-10-24T15:41:36.095Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "211cede9c96d2d1b25d47974cc4f41b7956facf0892d5c55813b4c7f6aa56dd3",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-bc46fcae6d81b9e404e150a2",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 242,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-10-24T15:42:30.945Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "a19a21b5af03ffe963d507f4ba4547c2ccb0deb66230b252bee9943f0cfead44",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-bc46fcae6d81b9e404e150a2",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 242,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "服务端请求伪造",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-10-24T15:42:30.946Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "a19a21b5af03ffe963d507f4ba4547c2ccb0deb66230b252bee9943f0cfead44",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-11d91165a75d56b3071658e7",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 261,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-10-24T15:42:30.946Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "73af7a91f44eee7c2cab5ee0aa50b1edbe123ee2853ef34d8a4e6be6948a820b",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-11d91165a75d56b3071658e7",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 261,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "服务端请求伪造",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-10-24T15:42:30.946Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "73af7a91f44eee7c2cab5ee0aa50b1edbe123ee2853ef34d8a4e6be6948a820b",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-17c1058e77df41bc2d94fa18",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 264,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-10-24T15:42:30.946Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "211cede9c96d2d1b25d47974cc4f41b7956facf0892d5c55813b4c7f6aa56dd3",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-17c1058e77df41bc2d94fa18",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 264,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "服务端请求伪造",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-10-24T15:42:30.946Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "211cede9c96d2d1b25d47974cc4f41b7956facf0892d5c55813b4c7f6aa56dd3",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-7ed3088d0f40e420a91a4e9b",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 179,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "服务端请求伪造",
+      "status": "fixed_candidate",
+      "decision": "repair_observed",
+      "at": "2026-10-24T15:43:49.135Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "aef11333f29b0be47ae419948fab2c0701a8103968b16a973d8dca700f6ff25f",
+        "candidate_before_evidence_hash": "aef11333f29b0be47ae419948fab2c0701a8103968b16a973d8dca700f6ff25f",
+        "post_change_evidence_hash_at_previous_location": "274c8be2a13e1de3ba24e3c7b313e3503aa69e3a8529ce94f60bd016a732a416",
+        "runtime_oracle": false,
+        "verification": {
+          "method": "mimosa-posttool-static-rescan",
+          "finding_absent": true,
+          "runtime_oracle": false
+        }
+      }
+    },
+    {
+      "finding_id": "mimosa-7ed3088d0f40e420a91a4e9b",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 179,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "服务端请求伪造",
+      "status": "static_verified",
+      "decision": "static_rescan_passed",
+      "at": "2026-10-24T15:43:49.135Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "observed",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "aef11333f29b0be47ae419948fab2c0701a8103968b16a973d8dca700f6ff25f",
+        "candidate_before_evidence_hash": "aef11333f29b0be47ae419948fab2c0701a8103968b16a973d8dca700f6ff25f",
+        "post_change_evidence_hash_at_previous_location": "274c8be2a13e1de3ba24e3c7b313e3503aa69e3a8529ce94f60bd016a732a416",
+        "runtime_oracle": false,
+        "verification": {
+          "method": "mimosa-posttool-static-rescan",
+          "finding_absent": true,
+          "runtime_oracle": false
+        }
+      }
+    },
+    {
+      "finding_id": "mimosa-11d91165a75d56b3071658e7",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 261,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "服务端请求伪造",
+      "status": "fixed_candidate",
+      "decision": "repair_observed",
+      "at": "2026-10-24T15:43:49.135Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "73af7a91f44eee7c2cab5ee0aa50b1edbe123ee2853ef34d8a4e6be6948a820b",
+        "candidate_before_evidence_hash": "73af7a91f44eee7c2cab5ee0aa50b1edbe123ee2853ef34d8a4e6be6948a820b",
+        "post_change_evidence_hash_at_previous_location": "7d34804878c5acedd04b9bf6ff3dfefde89a7f8c8363858a8a66b86bf5594c4f",
+        "runtime_oracle": false,
+        "verification": {
+          "method": "mimosa-posttool-static-rescan",
+          "finding_absent": true,
+          "runtime_oracle": false
+        }
+      }
+    },
+    {
+      "finding_id": "mimosa-11d91165a75d56b3071658e7",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 261,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "服务端请求伪造",
+      "status": "static_verified",
+      "decision": "static_rescan_passed",
+      "at": "2026-10-24T15:43:49.135Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "observed",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "73af7a91f44eee7c2cab5ee0aa50b1edbe123ee2853ef34d8a4e6be6948a820b",
+        "candidate_before_evidence_hash": "73af7a91f44eee7c2cab5ee0aa50b1edbe123ee2853ef34d8a4e6be6948a820b",
+        "post_change_evidence_hash_at_previous_location": "7d34804878c5acedd04b9bf6ff3dfefde89a7f8c8363858a8a66b86bf5594c4f",
+        "runtime_oracle": false,
+        "verification": {
+          "method": "mimosa-posttool-static-rescan",
+          "finding_absent": true,
+          "runtime_oracle": false
+        }
+      }
+    },
+    {
+      "finding_id": "mimosa-17c1058e77df41bc2d94fa18",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 264,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "服务端请求伪造",
+      "status": "fixed_candidate",
+      "decision": "repair_observed",
+      "at": "2026-10-24T15:43:49.135Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "211cede9c96d2d1b25d47974cc4f41b7956facf0892d5c55813b4c7f6aa56dd3",
+        "candidate_before_evidence_hash": "211cede9c96d2d1b25d47974cc4f41b7956facf0892d5c55813b4c7f6aa56dd3",
+        "post_change_evidence_hash_at_previous_location": "b13eafce7a3c4e45c60e6bfb80c109ff5ca1007c2535ae83e7d74cdc48f99e6a",
+        "runtime_oracle": false,
+        "verification": {
+          "method": "mimosa-posttool-static-rescan",
+          "finding_absent": true,
+          "runtime_oracle": false
+        }
+      }
+    },
+    {
+      "finding_id": "mimosa-17c1058e77df41bc2d94fa18",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 264,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "服务端请求伪造",
+      "status": "static_verified",
+      "decision": "static_rescan_passed",
+      "at": "2026-10-24T15:43:49.135Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "observed",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "211cede9c96d2d1b25d47974cc4f41b7956facf0892d5c55813b4c7f6aa56dd3",
+        "candidate_before_evidence_hash": "211cede9c96d2d1b25d47974cc4f41b7956facf0892d5c55813b4c7f6aa56dd3",
+        "post_change_evidence_hash_at_previous_location": "b13eafce7a3c4e45c60e6bfb80c109ff5ca1007c2535ae83e7d74cdc48f99e6a",
+        "runtime_oracle": false,
+        "verification": {
+          "method": "mimosa-posttool-static-rescan",
+          "finding_absent": true,
+          "runtime_oracle": false
+        }
+      }
+    },
+    {
+      "finding_id": "mimosa-bc46fcae6d81b9e404e150a2",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 242,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "服务端请求伪造",
+      "status": "fixed_candidate",
+      "decision": "repair_observed",
+      "at": "2026-10-24T15:43:49.135Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "a19a21b5af03ffe963d507f4ba4547c2ccb0deb66230b252bee9943f0cfead44",
+        "candidate_before_evidence_hash": "a19a21b5af03ffe963d507f4ba4547c2ccb0deb66230b252bee9943f0cfead44",
+        "post_change_evidence_hash_at_previous_location": "7182dd431b5c8833ed3c8a02c8615780df8dca7d83ed4166962b207f45a656b5",
+        "runtime_oracle": false,
+        "verification": {
+          "method": "mimosa-posttool-static-rescan",
+          "finding_absent": true,
+          "runtime_oracle": false
+        }
+      }
+    },
+    {
+      "finding_id": "mimosa-bc46fcae6d81b9e404e150a2",
+      "file": "edge-functions/api/[[default]].js",
+      "line": 242,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "服务端请求伪造",
+      "status": "static_verified",
+      "decision": "static_rescan_passed",
+      "at": "2026-10-24T15:43:49.135Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "observed",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "a19a21b5af03ffe963d507f4ba4547c2ccb0deb66230b252bee9943f0cfead44",
+        "candidate_before_evidence_hash": "a19a21b5af03ffe963d507f4ba4547c2ccb0deb66230b252bee9943f0cfead44",
+        "post_change_evidence_hash_at_previous_location": "7182dd431b5c8833ed3c8a02c8615780df8dca7d83ed4166962b207f45a656b5",
+        "runtime_oracle": false,
+        "verification": {
+          "method": "mimosa-posttool-static-rescan",
+          "finding_absent": true,
+          "runtime_oracle": false
+        }
+      }
+    },
+    {
+      "finding_id": "mimosa-78c46911bbbc1d123c956f37",
+      "file": "package.json",
+      "line": 16,
+      "rule_id": "mimosa.supply.version-range",
+      "severity": "low",
+      "category": "manifest",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-10-24T16:12:37.296Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "a07061b871409342d317846ee07b9349ef88d0cc9e4bd137c03d73d23242e557",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-59de1b292e7e32fd78bcc658",
+      "file": "AGENTS.md",
+      "line": 9,
+      "rule_id": "mimosa.agent.secret-exfiltration",
+      "severity": "high",
+      "category": "instruction",
+      "status": "blocked",
+      "decision": "stop_rewake",
+      "at": "2026-10-24T16:12:37.296Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "b4fa1e3c93dbe244038ab135d679344a7991b9afd9b5332279c8e5b31e408354",
+        "runtime_oracle": false
+      }
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "mimosa-78c46911bbbc1d123c956f37",
+      "file": "package.json",
+      "line": 16,
+      "end_line": 16,
+      "rule_id": "mimosa.supply.version-range",
+      "severity": "low",
+      "category": "manifest",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": "package.json",
+          "line": 16,
+          "evidence_hash": "a07061b871409342d317846ee07b9349ef88d0cc9e4bd137c03d73d23242e557",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-59de1b292e7e32fd78bcc658",
+      "file": "AGENTS.md",
+      "line": 9,
+      "end_line": 9,
+      "rule_id": "mimosa.agent.secret-exfiltration",
+      "severity": "high",
+      "category": "instruction",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "blocked",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": "AGENTS.md",
+          "line": 9,
+          "evidence_hash": "b4fa1e3c93dbe244038ab135d679344a7991b9afd9b5332279c8e5b31e408354",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": true
+    }
+  ],
   "artifacts": {
-    "immutable_report": ".mimosa/reports/task-review-session_525068c1be63144f73c4467647e628f8-20261024T025745315Z-37816-f6aaa463b1cb.json",
+    "immutable_report": ".mimosa/reports/task-review-session_525068c1be63144f73c4467647e628f8-20261024T161237296Z-54880-ef85b29a9da9.json",
     "latest_report": ".mimosa/reports/task-review-session_525068c1be63144f73c4467647e628f8.json",
-    "history_summary": ".mimosa/history/run-20261024T025745315Z-37816-f6aaa463b1cb.json"
+    "history_summary": ".mimosa/history/run-20261024T161237296Z-54880-ef85b29a9da9.json"
   }
 }

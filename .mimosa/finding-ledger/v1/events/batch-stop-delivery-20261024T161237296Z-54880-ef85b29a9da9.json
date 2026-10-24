@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-delivery-20261024T161237296Z-54880-ef85b29a9da9",
+  "runId": "20261024T161237296Z-54880-ef85b29a9da9",
+  "runStatus": "completed",
+  "coverage": {
+    "status": "complete",
+    "reasons": []
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "StopDelivery"
+  },
+  "revision": "294de61821b36948667dda70626ca241a758ed9f",
+  "diffHash": "1069cb2d5f4ae331d44cc25f50a1dca674b89a51c485bb19bd48c33f79447c60",
+  "rulesVersion": "unavailable",
+  "sessionHash": "4e9fb982349d982c92323ef867fda797c76f2fe8f49f24770846f94cb127d887",
+  "reportRef": ".mimosa/reports/task-review-session_525068c1be63144f73c4467647e628f8-20261024T161237296Z-54880-ef85b29a9da9.json",
+  "events": [
+    {
+      "eventId": "hook-a1bc6f9dbc51cbe915fd4e1c57d6bfde",
+      "findingId": "mimosa-59de1b292e7e32fd78bcc658",
+      "type": "finding_blocked",
+      "at": "2026-10-24T16:12:37.752Z",
+      "identity": {
+        "projectRelativeFile": "AGENTS.md",
+        "ruleId": "mimosa.agent.secret-exfiltration",
+        "codeEvidenceHash": "b4fa1e3c93dbe244038ab135d679344a7991b9afd9b5332279c8e5b31e408354",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 9,
+      "endLine": 9,
+      "reasonCode": "stop_rewake",
+      "reportedToAgent": true,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "b4fa1e3c93dbe244038ab135d679344a7991b9afd9b5332279c8e5b31e408354"
+      },
+      "sequence": 0
+    }
+  ],
+  "observedFindingIds": [],
+  "verifiedFiles": [],
+  "recordedAt": "2026-10-24T16:12:38.211Z"
+}
