@@ -1,0 +1,220 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="搜索" description="搜索美西螈池塘的全部文章：标题、标签、摘要与全文。">
+  <section class="container page">
+    <header class="page__head">
+      <h1>搜索</h1>
+      <p>输入关键词，标题、标签、摘要和正文都会被翻一遍。</p>
+    </header>
+    <input
+      id="search-input"
+      class="search-box"
+      type="search"
+      placeholder="搜点什么？比如：美西螈、CSS、读书……"
+      autocomplete="off"
+      autofocus
+    />
+    <p id="search-count" class="search-page__count" aria-live="polite"></p>
+    <div id="search-results" class="search-results">
+      <p class="search-page__empty">池塘里捞一杆试试 ↑</p>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  type SearchDoc = {
+    id: string;
+    title: string;
+    description: string;
+    tags: string[];
+    date: string;
+    text: string;
+  };
+
+  const input = document.getElementById('search-input') as HTMLInputElement;
+  const resultsEl = document.getElementById('search-results')!;
+  const countEl = document.getElementById('search-count')!;
+
+  let indexPromise: Promise<SearchDoc[]> | null = null;
+  function loadIndex() {
+    indexPromise ??= fetch('/search.json').then((r) => r.json());
+    return indexPromise;
+  }
+
+  function esc(s: string) {
+    return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  }
+
+  /** 在原文 s 里命中 q 的片段加上 <mark>（按小写定位，原文分三段转义） */
+  function highlight(s: string, q: string, lower: string): string {
+    const i = lower.indexOf(q);
+    if (i < 0) return esc(s);
+    return esc(s.slice(0, i)) + '<mark>' + esc(s.slice(i, i + q.length)) + '</mark>' + esc(s.slice(i + q.length));
+  }
+
+  function dateStr(iso: string) {
+    return new Date(iso).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+  }
+
+  function renderHit(doc: SearchDoc, q: string): string {
+    const lowerTitle = doc.title.toLowerCase();
+    const lowerText = doc.text.toLowerCase();
+    return (
+      `<a class="card search-hit" href="/blog/${doc.id}/">` +
+      `<div class="search-hit__meta"><time>${esc(dateStr(doc.date))}</time>` +
+      (doc.tags.length > 0 ? `<div class="search-hit__tags">${doc.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : '') +
+      `</div>` +
+      `<h3 class="search-hit__title">${highlight(doc.title, q, lowerTitle)}</h3>` +
+      `<p class="search-hit__desc">${highlight(doc.description, q, doc.description.toLowerCase())}</p>` +
+      snippetPara(doc, q, lowerText) +
+      `</a>`
+    );
+  }
+
+  function snippetPara(doc: SearchDoc, q: string, lowerText: string): string {
+    const i = lowerText.indexOf(q);
+    if (i < 0) return '';
+    const start = Math.max(0, i - 45);
+    const end = Math.min(doc.text.length, i + q.length + 45);
+    const piece = doc.text.slice(start, end);
+    const lowerPiece = lowerText.slice(start, end);
+    return (
+      `<p class="search-hit__snippet">` +
+      (start > 0 ? '…' : '') +
+      highlight(piece, q, lowerPiece) +
+      (end < doc.text.length ? '…' : '') +
+      `</p>`
+    );
+  }
+
+  async function render(q: string) {
+    if (!q) {
+      countEl.textContent = '';
+      resultsEl.innerHTML = '<p class="search-page__empty">池塘里捞一杆试试 ↑</p>';
+      return;
+    }
+    const docs = await loadIndex();
+    const nq = q.toLowerCase();
+    const hits = docs
+      .map((doc) => {
+        let score = 0;
+        if (doc.title.toLowerCase().includes(nq)) score += 3;
+        if (doc.tags.some((t) => t.toLowerCase().includes(nq))) score += 2;
+        if (doc.description.toLowerCase().includes(nq)) score += 1;
+        if (doc.text.toLowerCase().includes(nq)) score += 1;
+        return { doc, score };
+      })
+      .filter((h) => h.score > 0)
+      .sort((a, b) => b.score - a.score);
+    countEl.textContent = hits.length > 0 ? `找到 ${hits.length} 篇与「${q}」相关的文章` : `池塘里没有捞到「${q}」，换个词试试？`;
+    resultsEl.innerHTML = hits.map((h) => renderHit(h.doc, nq)).join('');
+  }
+
+  function run() {
+    const q = input.value.trim();
+    history.replaceState(null, '', q ? `/search/?q=${encodeURIComponent(q)}` : '/search/');
+    render(q);
+  }
+
+  input.addEventListener('input', run);
+  const urlQ = new URLSearchParams(location.search).get('q');
+  if (urlQ) {
+    input.value = urlQ;
+    render(urlQ);
+  }
+</script>
+
+<style>
+  .search-box {
+    width: 100%;
+    padding: 14px 18px;
+    font: inherit;
+    font-size: 16px;
+    color: var(--text);
+    background: var(--surface);
+    border: var(--border-w) solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow);
+    outline: none;
+  }
+
+  .search-box:focus-visible {
+    border-color: var(--accent);
+  }
+
+  .search-page__count {
+    color: var(--text-muted);
+    font-size: 14px;
+    font-family: var(--font-display);
+    margin: 14px 0 0;
+    min-height: 1.5em;
+  }
+
+  .search-results {
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* 结果卡片由脚本 innerHTML 注入，拿不到 scoped 的 data-astro-cid 属性，须用 :global 匹配 */
+  :global(.search-hit) {
+    padding: 20px 24px;
+    display: block;
+  }
+
+  :global(.search-hit__meta) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+
+  :global(.search-hit__meta time) {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-family: var(--font-display);
+  }
+
+  :global(.search-hit__tags) {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  :global(.search-hit__title) {
+    margin: 0 0 4px;
+    font-size: 19px;
+  }
+
+  :global(.search-hit__desc) {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 14.5px;
+    line-height: 1.7;
+  }
+
+  :global(.search-hit__snippet) {
+    margin: 8px 0 0;
+    color: var(--text-muted);
+    font-size: 13.5px;
+    line-height: 1.8;
+  }
+
+  :global(.search-page__empty) {
+    color: var(--text-muted);
+    text-align: center;
+    padding: 40px 0;
+  }
+
+  :global(.search-hit mark) {
+    background: var(--surface-2);
+    color: var(--accent);
+    padding: 0 2px;
+    border-radius: 4px;
+  }
+</style>
