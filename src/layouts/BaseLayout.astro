@@ -60,6 +60,9 @@ const pageTitle = title ? `${title} · ${SITE.name}` : `${SITE.name} · ${SITE.n
         var st = document.createElement('style');
         st.textContent = css;
         document.head.appendChild(st);
+        // 标签页 favicon 也随机一只（link[rel=icon] 在本脚本之前；无 JS 时兜底 favicon.png 粉螈）
+        var icon = document.querySelector('link[rel="icon"]');
+        if (icon) icon.href = '/favicon-' + V[Math.floor(Math.random() * 7)] + '.png';
       })();
     </script>
   </head>

@@ -1,6 +1,7 @@
 // 生成美西螈全家族位图变体：从启动器粉色原图按亮度阶梯重上色。
 // 色板锚点采样自 Minecraft 1.18 官方贴图（scripts/sample-official.mjs），
-// 紫色为站点二创色。重新生成：node scripts/generate-variants.mjs
+// 紫色为站点二创色。同时按同构图合成七色 favicon（public/favicon-*.png）。
+// 重新生成：node scripts/generate-variants.mjs
 import { readFileSync, writeFileSync } from 'node:fs';
 import { decodePng, encodePng } from './png.mjs';
 
@@ -61,6 +62,19 @@ for (let i = 0; i < w * h; i++) {
 // 2) 逐变体重上色：彩色像素按归一化亮度查锚点插值，中性像素（眼/白）保留；
 //    配置了 gill 的变体，最暗的彩色带（外鳃区域）用鳃部色带
 const GILL_BAND = 0.16; // 源图归一化亮度低于此值的彩色像素视为鳃
+
+// favicon 合成：256×256 透明底，螈图原样贴在 (0, 38)（与现有 favicon.png 同构）
+const FW = 256, FH = 256, FY = 38;
+function favicon(rgbaSrc) {
+  const buf = Buffer.alloc(FW * FH * 4);
+  for (let y = 0; y < h; y++) {
+    rgbaSrc.copy(buf, (y + FY) * FW * 4, y * w * 4, (y + 1) * w * 4);
+  }
+  return encodePng({ w: FW, h: FH, rgba: buf });
+}
+writeFileSync('public/favicon-pink.png', favicon(rgba));
+console.log('ok public/favicon-pink.png');
+
 for (const [name, cfg] of Object.entries(RAMPS)) {
   const body = cfg.body.map(hex);
   const gill = cfg.gill ? cfg.gill.map(hex) : null;
@@ -77,4 +91,7 @@ for (const [name, cfg] of Object.entries(RAMPS)) {
   const file = `public/assets/axolotl-${name}.png`;
   writeFileSync(file, encodePng({ w, h, rgba: out }));
   console.log(`ok ${file}`);
+  const favFile = `public/favicon-${name}.png`;
+  writeFileSync(favFile, favicon(out));
+  console.log(`ok ${favFile}`);
 }
