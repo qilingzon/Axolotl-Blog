@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Axolotl from '../components/Axolotl.astro';
+import AxolotlCycle from '../components/AxolotlCycle.astro';
 import PostCard from '../components/PostCard.astro';
 import { getCollection } from 'astro:content';
 import { SITE } from '../config';
@@ -30,8 +31,12 @@ const posts = (await getCollection('blog'))
         <span class="bubble bubble--2"></span>
         <span class="bubble bubble--3"></span>
         <span class="bubble bubble--4"></span>
-        <Axolotl variant="pink" mode="swim" size={230} class="hero__swim" />
-        <Axolotl variant="purple" mode="face" size={132} class="hero__face" />
+        <div class="hero__swim">
+          <AxolotlCycle size={230} />
+        </div>
+        <div class="hero__face">
+          <AxolotlCycle size={132} phase={1.4} />
+        </div>
       </div>
     </div>
   </section>
@@ -245,11 +250,6 @@ const posts = (await getCollection('blog'))
 
     .hero__art {
       min-height: 130px;
-    }
-
-    .hero__swim :global(svg),
-    .hero__art > :global(svg) {
-      width: auto;
     }
 
     .hero {
