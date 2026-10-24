@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "pretooluse-14e5e0c23c16204f3158251f274ef2ca",
+  "runId": null,
+  "runStatus": "completed",
+  "coverage": {
+    "status": "complete",
+    "reasons": []
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "PreToolUse"
+  },
+  "revision": null,
+  "diffHash": null,
+  "rulesVersion": null,
+  "sessionHash": "4e9fb982349d982c92323ef867fda797c76f2fe8f49f24770846f94cb127d887",
+  "reportRef": null,
+  "events": [
+    {
+      "eventId": "hook-f60b609adc2fb12a16876da1c01c97e4",
+      "findingId": "mimosa-7ed3088d0f40e420a91a4e9b",
+      "type": "finding_blocked",
+      "at": "2026-10-24T15:40:26.593Z",
+      "identity": {
+        "projectRelativeFile": "edge-functions/api/[[default]].js",
+        "ruleId": "security",
+        "codeEvidenceHash": "aef11333f29b0be47ae419948fab2c0701a8103968b16a973d8dca700f6ff25f",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 179,
+      "endLine": 179,
+      "reasonCode": "deny",
+      "reportedToAgent": true,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "aef11333f29b0be47ae419948fab2c0701a8103968b16a973d8dca700f6ff25f"
+      },
+      "sequence": 0
+    },
+    {
+      "eventId": "hook-71e4bd752f0c60add1d989447a4d56da",
+      "findingId": "mimosa-11d91165a75d56b3071658e7",
+      "type": "finding_blocked",
+      "at": "2026-10-24T15:40:26.593Z",
+      "identity": {
+        "projectRelativeFile": "edge-functions/api/[[default]].js",
+        "ruleId": "security",
+        "codeEvidenceHash": "73af7a91f44eee7c2cab5ee0aa50b1edbe123ee2853ef34d8a4e6be6948a820b",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 192,
+      "endLine": 192,
+      "reasonCode": "deny",
+      "reportedToAgent": true,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "73af7a91f44eee7c2cab5ee0aa50b1edbe123ee2853ef34d8a4e6be6948a820b"
+      },
+      "sequence": 1
+    },
+    {
+      "eventId": "hook-f976d6a427f0f497acb75f66ed1c3e75",
+      "findingId": "mimosa-17c1058e77df41bc2d94fa18",
+      "type": "finding_blocked",
+      "at": "2026-10-24T15:40:26.593Z",
+      "identity": {
+        "projectRelativeFile": "edge-functions/api/[[default]].js",
+        "ruleId": "security",
+        "codeEvidenceHash": "211cede9c96d2d1b25d47974cc4f41b7956facf0892d5c55813b4c7f6aa56dd3",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 195,
+      "endLine": 195,
+      "reasonCode": "deny",
+      "reportedToAgent": true,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "211cede9c96d2d1b25d47974cc4f41b7956facf0892d5c55813b4c7f6aa56dd3"
+      },
+      "sequence": 2
+    }
+  ],
+  "observedFindingIds": [],
+  "verifiedFiles": [],
+  "recordedAt": "2026-10-24T15:40:26.999Z"
+}

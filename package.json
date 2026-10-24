@@ -11,5 +11,8 @@
   "dependencies": {
     "@fontsource/fusion-pixel-12px-proportional-sc": "^5.3.0",
     "astro": "^5.0.0"
+  },
+  "devDependencies": {
+    "edgeone": "^1.6.46"
   }
 }
