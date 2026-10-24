@@ -1,11 +1,27 @@
 {
   "schema_version": "mimosa-task-review/v2",
-  "run_id": "20261024T034213012Z-39012-187d4ea51a82",
-  "run_status": "completed",
-  "errors": [],
+  "run_id": "20261024T152049492Z-37468-c4c52bb8a732",
+  "run_status": "inconclusive",
+  "errors": [
+    {
+      "stage": "baseline-read",
+      "target": "public/admin/sveltia-cms.js",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "scan",
+      "target": "public/admin/sveltia-cms.js",
+      "reason": "deterministic_scanner_unavailable: deterministic scanner unavailable"
+    },
+    {
+      "stage": "scan",
+      "target": "public/admin/sveltia-cms.js",
+      "reason": "file_skipped: 文件过大（2533KB），已跳过未扫描"
+    }
+  ],
   "coverage": {
     "schema_version": "mimosa-hook-coverage/v1",
-    "status": "complete",
+    "status": "partial",
     "scope": "hook_observed_diff",
     "baseline": {
       "complete": true,
@@ -14,27 +30,27 @@
       "truncated": false,
       "enumeration_error_count": 0,
       "snapshot_error_count": 0,
-      "compensated_target_count": 2
+      "compensated_target_count": 0
     },
     "change_tracking": {
-      "touched_observed": 2,
-      "touched_retained": 2,
+      "touched_observed": 0,
+      "touched_retained": 0,
       "truncated": false,
       "bash_mutation": true,
-      "bash_discovered": 2,
+      "bash_discovered": 1,
       "bash_discovery_limit": 80,
       "bash_discovery_truncated": false
     },
     "candidates": {
-      "eligible_files": 2,
-      "selected_files": 2,
+      "eligible_files": 1,
+      "selected_files": 1,
       "limit": 20,
       "truncated": false
     },
     "scanning": {
-      "required_files": 2,
-      "scanned_files": 2,
-      "skipped_files": 0,
+      "required_files": 1,
+      "scanned_files": 0,
+      "skipped_files": 1,
       "failed_files": 0,
       "project_checks_required": 0,
       "project_checks_completed": 0
@@ -45,48 +61,85 @@
       "detail_limit": 3,
       "truncated": false
     },
-    "reason_counts": {},
-    "reasons": [],
-    "reasons_truncated": false
-  },
-  "generated_at": "2026-10-24T03:42:13.012Z",
-  "session_id": "session_3b1741581889b3b125ad0e82829a89aa",
-  "target": ".",
-  "revision": "5f38a6544ed508299e61fa145c05d3ab5985baf2",
-  "rules_version": "unavailable",
-  "diff_hash": "23819a0ee66f9e1cd05984a03aff2f9fa893c0eb90064175b4dcb327a77db301",
-  "diff": {
-    "algorithm": "sha256",
-    "changed_file_count": 2,
-    "changed_files": [
+    "reason_counts": {
+      "baseline_snapshot_unreadable": 1,
+      "deterministic_scanner_unavailable": 1,
+      "file_skipped": 1,
+      "project_check_failed": 3
+    },
+    "reasons": [
       {
-        "file": "src/config.ts",
-        "ranges": [
-          {
-            "start": 10,
-            "end": 10
-          }
-        ],
-        "before_hash": "137c08f6c9eb1ed5a39c114e8320205a9b6890e927e89801804b8ab09035c6bd",
-        "after_hash": "be96353d9b86fec94129cbebafce6f6a141f64a9ddd264dd8f0c4d171cdac51d"
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": "public/admin/sveltia-cms.js",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
       },
       {
-        "file": "src/pages/search.json.ts",
+        "code": "deterministic_scanner_unavailable",
+        "stage": "scan",
+        "target": "public/admin/sveltia-cms.js",
+        "detail": "deterministic scanner unavailable",
+        "affects_completion": true
+      },
+      {
+        "code": "file_skipped",
+        "stage": "scan",
+        "target": "public/admin/sveltia-cms.js",
+        "detail": "文件过大（2533KB），已跳过未扫描",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": "public/admin/sveltia-cms.js",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "public/admin/sveltia-cms.js",
+        "detail": "deterministic_scanner_unavailable: deterministic scanner unavailable",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "public/admin/sveltia-cms.js",
+        "detail": "file_skipped: 文件过大（2533KB），已跳过未扫描",
+        "affects_completion": true
+      }
+    ],
+    "reasons_truncated": false
+  },
+  "generated_at": "2026-10-24T15:20:49.492Z",
+  "session_id": "session_3b1741581889b3b125ad0e82829a89aa",
+  "target": ".",
+  "revision": "7ca77631abf7b6cc7fbbe828e923c7e19de26aaa",
+  "rules_version": "unavailable",
+  "diff_hash": "40e315f1745e7e02cbdd12b7c2e8907b69aebc7aa4d0384442b3e904e894da65",
+  "diff": {
+    "algorithm": "sha256",
+    "changed_file_count": 1,
+    "changed_files": [
+      {
+        "file": "public/admin/sveltia-cms.js",
         "ranges": [
           {
             "start": 1,
-            "end": 31
+            "end": 3753
           }
         ],
         "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "after_hash": "aa07385a3f4965e149428d530931d7c66ef721f20eacd5afce7627ca596acc6f"
+        "after_hash": "581677b43c1eb04637cd9482af2bbed280934d4783dce40386b100a19f8e80f8"
       }
     ]
   },
   "timing": {
-    "started_at": "2026-10-24T03:42:11.861Z",
-    "completed_at": "2026-10-24T03:42:13.012Z",
-    "duration_ms": 1151,
+    "started_at": "2026-10-24T15:20:48.279Z",
+    "completed_at": "2026-10-24T15:20:49.492Z",
+    "duration_ms": 1213,
     "measurement": "hook_wall_clock"
   },
   "tokens": {
@@ -100,11 +153,11 @@
     "schemaVersion": "mimosa-gate-telemetry/v1",
     "profile": "gate",
     "operation": "Stop",
-    "outcome": "complete",
-    "latencyMs": 1151,
-    "peakMemoryBytes": 140443648,
+    "outcome": "partial/INCONCLUSIVE",
+    "latencyMs": 1213,
+    "peakMemoryBytes": 141062144,
     "memoryMeasurement": "max-observed-process-rss",
-    "scannedFiles": 2,
+    "scannedFiles": 0,
     "cache": {
       "hits": 0,
       "misses": 0,
@@ -129,8 +182,8 @@
   "finding_events": [],
   "findings": [],
   "artifacts": {
-    "immutable_report": ".mimosa/reports/task-review-session_3b1741581889b3b125ad0e82829a89aa-20261024T034213012Z-39012-187d4ea51a82.json",
+    "immutable_report": ".mimosa/reports/task-review-session_3b1741581889b3b125ad0e82829a89aa-20261024T152049492Z-37468-c4c52bb8a732.json",
     "latest_report": ".mimosa/reports/task-review-session_3b1741581889b3b125ad0e82829a89aa.json",
-    "history_summary": ".mimosa/history/run-20261024T034213012Z-39012-187d4ea51a82.json"
+    "history_summary": ".mimosa/history/run-20261024T152049492Z-37468-c4c52bb8a732.json"
   }
 }

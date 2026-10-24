@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20261024T152049492Z-37468-c4c52bb8a732",
+  "runId": "20261024T152049492Z-37468-c4c52bb8a732",
+  "runStatus": "inconclusive",
+  "coverage": {
+    "status": "partial",
+    "reasons": [
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": "public/admin/sveltia-cms.js",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "deterministic_scanner_unavailable",
+        "stage": "scan",
+        "target": "public/admin/sveltia-cms.js",
+        "detail": "deterministic scanner unavailable",
+        "affectsCompletion": true
+      },
+      {
+        "code": "file_skipped",
+        "stage": "scan",
+        "target": "public/admin/sveltia-cms.js",
+        "detail": "文件过大（2533KB），已跳过未扫描",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": "public/admin/sveltia-cms.js",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "public/admin/sveltia-cms.js",
+        "detail": "deterministic_scanner_unavailable: deterministic scanner unavailable",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "public/admin/sveltia-cms.js",
+        "detail": "file_skipped: 文件过大（2533KB），已跳过未扫描",
+        "affectsCompletion": true
+      }
+    ]
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "7ca77631abf7b6cc7fbbe828e923c7e19de26aaa",
+  "diffHash": "40e315f1745e7e02cbdd12b7c2e8907b69aebc7aa4d0384442b3e904e894da65",
+  "rulesVersion": "unavailable",
+  "sessionHash": "bb4cdf3794cdf9e673e68c1e243b169b3027a17f9fd1bf2ac12cf49ce77308bb",
+  "reportRef": ".mimosa/reports/task-review-session_3b1741581889b3b125ad0e82829a89aa-20261024T152049492Z-37468-c4c52bb8a732.json",
+  "events": [],
+  "observedFindingIds": [],
+  "verifiedFiles": [],
+  "recordedAt": "2026-10-24T15:20:49.946Z"
+}
