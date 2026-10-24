@@ -491,7 +491,7 @@ a.card:hover {
 /* ---------- 加载界面（splash） ----------
    首帧前由 <head> 内联脚本决定：
    - html.no-splash        本会话已看过，整层不渲染
-   - html[data-splash=pink|purple] 展示哪只美西螈 */
+   七只美西螈同位叠加，按 2.8s 周期交叉淡入轮换七色 */
 
 .splash {
   position: fixed;
@@ -530,17 +530,57 @@ a.card:hover {
 }
 
 .splash__axolotl {
-  display: none;
+  position: absolute;
   width: 150px;
-  animation: splash-bob 2.2s ease-in-out infinite;
+  opacity: 0;
+  animation:
+    splash-bob 2.2s ease-in-out infinite,
+    splash-cycle 2.8s linear infinite;
 }
 
-[data-splash='pink'] .splash__axolotl--pink {
-  display: block;
+/* 七色轮换：每只的 cycle 负延迟对准自己色槽"淡入完成后"的时刻，
+   保证任意时刻恰有一只完整可见（渲染时钟被节流冻结时也不会空场） */
+.splash__axolotl--1 {
+  opacity: 1;
+  animation-delay:
+    0s,
+    -0.06s;
 }
 
-[data-splash='purple'] .splash__axolotl--purple {
-  display: block;
+.splash__axolotl--2 {
+  animation-delay:
+    0s,
+    -0.46s;
+}
+
+.splash__axolotl--3 {
+  animation-delay:
+    -0.7s,
+    -0.86s;
+}
+
+.splash__axolotl--4 {
+  animation-delay:
+    -1.4s,
+    -1.26s;
+}
+
+.splash__axolotl--5 {
+  animation-delay:
+    0.3s,
+    -1.66s;
+}
+
+.splash__axolotl--6 {
+  animation-delay:
+    -1s,
+    -2.06s;
+}
+
+.splash__axolotl--7 {
+  animation-delay:
+    -0.4s,
+    -2.46s;
 }
 
 .splash__bubble {
@@ -617,6 +657,25 @@ a.card:hover {
   }
 }
 
+/* 七色轮换：每个周期 2.8s 分 7 槽（每槽约 0.4s），槽内快速淡入-停留-淡出 */
+@keyframes splash-cycle {
+  0% {
+    opacity: 0;
+  }
+  2% {
+    opacity: 1;
+  }
+  12% {
+    opacity: 1;
+  }
+  14.28% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 @keyframes splash-rise {
   0% {
     transform: translateY(0);
@@ -676,6 +735,11 @@ a.card:hover {
   .splash__bar i,
   .splash__text::after {
     animation: none;
+  }
+
+  /* 动画停用时只展示粉螈（基础 opacity 已保证），其余保持隐藏 */
+  .splash__axolotl:not(.splash__axolotl--1) {
+    opacity: 0;
   }
 }
 
