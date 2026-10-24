@@ -157,7 +157,12 @@ function assertOutboundAllowed(url) {
  * segments: string[]（每段 encodeURIComponent）；query: Record<string,string>
  */
 async function ghFetch(segments, { method = 'GET', body, query = {} } = {}) {
-  const path = segments.map((s) => encodeURIComponent(String(s))).join('/');
+  // 段内允许斜杠（repo 名、目录路径），先拆分再逐段编码
+  const path = segments
+    .flatMap((s) => String(s).split('/'))
+    .filter(Boolean)
+    .map((s) => encodeURIComponent(s))
+    .join('/');
   const qs = new URLSearchParams({ ref: CFG.branch(), ...(query || {}) });
   const url = `${GH_API}/${path}?${qs.toString()}`;
   assertOutboundAllowed(url);
@@ -203,7 +208,7 @@ export async function onRequest(context) {
   const method = request.method;
 
   try {
-    if (path === '/api/login' && method === 'POST') return handleLogin(request);
+    if (path === '/api/login' && method === 'POST') return await handleLogin(request);
     if (!envConfigured()) {
       return fail(
         'CMS 尚未配置：请在 EdgeOne 项目环境变量里设置 CMS_USERNAME / CMS_PASSWORD / CMS_SESSION_SECRET / CMS_GITHUB_TOKEN',
@@ -216,13 +221,13 @@ export async function onRequest(context) {
     if (path === '/api/session' && method === 'GET') {
       return json({ user: auth.u, expiresAt: auth.e });
     }
-    if (path === '/api/posts' && method === 'GET') return handleListPosts();
+    if (path === '/api/posts' && method === 'GET') return await handleListPosts();
     if (path.startsWith('/api/posts/')) {
-      return handlePostItem(method, path.slice('/api/posts/'.length), request);
+      return await handlePostItem(method, path.slice('/api/posts/'.length), request);
     }
-    if (path === '/api/media' && method === 'GET') return handleListMedia();
-    if (path === '/api/media' && method === 'POST') return handleUploadMedia(request);
-    if (path === '/api/media' && method === 'DELETE') return handleDeleteMedia(url);
+    if (path === '/api/media' && method === 'GET') return await handleListMedia();
+    if (path === '/api/media' && method === 'POST') return await handleUploadMedia(request);
+    if (path === '/api/media' && method === 'DELETE') return await handleDeleteMedia(url);
     return fail('接口不存在', 404);
   } catch (err) {
     const status = err && err.status ? (err.status === 404 ? 500 : 502) : 500;

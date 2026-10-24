@@ -5,7 +5,10 @@
 ## 当前状态
 
 - 工程：D:\zcodework\blog / Astro 5.18.2 纯静态博客 / 主题：Minecraft 紫粉美西螈
-- 进度：**阶段 1-5 完成 ✅ + 启动器吉祥物 ✅ + 加载界面 ✅ + 七色美西螈家族（官方全色 + wiki 核对）✅**
+- 进度：**阶段 1-5 ✅ + 吉祥物家族/加载动画/搜索/移动端 ✅ + 美西螈 CMS（EdgeOne Pages 版）✅**
+  - **美西螈 CMS**：`public/admin/`（全中文三主题 SPA）+ `edge-functions/api/[[default]].js`（登录鉴权 + GitHub 代理；出站白名单仅 api.github.com；HMAC 签名 token 12h；连续错 5 次锁 15 分钟）+ `scripts/cms-dev.mjs`（本地环境 8090，`.env.local` 供凭据已 gitignore）。Sveltia 已移除，部署指南见 README-CMS.md（EdgeOne 控制台接仓库 + CMS_USERNAME/PASSWORD/SESSION_SECRET/GITHUB_TOKEN 四个环境变量）
+  - 草稿功能：schema `draft` 字段，前台首页/列表/getStaticPaths/搜索四处过滤（已验证）
+  - CMS E2E 已验证（cms-test 分支真实读写后清理）：登录对错/401/防爆破、文章 CRUD、改名迁移、媒体上传删除、中文 commit、UTF-8 全链路无损。**坑：Git Bash curl 命令行传中文会 GBK 乱码，测试 JSON 必须用 `--data-binary @文件`；ghFetch 段内斜杠先拆分再编码（repo 名含 `/`）；onRequest 里 async 处理器必须 await，否则 rejection 绕过 try/catch**
   - wiki 核对结论（minecraft.wiki）：官方五色 = lucy 粉 / wild 棕 / gold 金 / cyan 青·**粉鳃** / blue 蓝（gold 是正式变体非废案）；唯一未进游戏的官方色是 **green 绿**（Minecraft Live 2020 预告片后被砍）→ 已作为彩蛋成员加入
   - 七色家族：pink=启动器原图；purple 紫二创；wild/cyan/gold/blue 采样自 1.18.jar 官方贴图（cyan 用鳃部独立色带还原粉鳃）；green 手调色板。生成器 `scripts/generate-variants.mjs` 支持 `gill` 色带。展示位：关于页住民五只（汽水/焦糖/栗子/蓝图/抹茶）、404 七只、文章卡片 accent 轮换、加载层粉/紫
   - 加载界面（splash）：七色美西螈轮换——七张变体图同位叠加，纯 CSS 交叉淡入（周期 2.8s、每色槽 0.4s）+ 摆尾 + 水泡 + 方块进度条 + 「正在游向池塘」；**每张图的 cycle 负延迟对准自己色槽淡入完成的时刻**，渲染时钟被节流冻结时也恰有一只完整可见（IAB 遮挡面板会冻结动画时钟，这是踩过的坑）；load 后最少展示 0.7s 淡出（3s 兜底，prefers-reduced-motion 停轮换只显粉螈）；sessionStorage `axo-splash-seen` 会话内只展示一次
