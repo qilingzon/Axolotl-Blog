@@ -141,6 +141,7 @@ function api(method, endpoint, opts) {
 }
 
 function logout(manual) {
+  editorGuard = null;
   state.token = '';
   state.user = '';
   state.expiresAt = 0;
@@ -159,8 +160,38 @@ function loggedIn() {
 
 var app = null;
 
+// ---------- 未保存保护 ----------
+// 编辑器打开时登记 editorGuard（route + isDirty + ask）；nav 拦截一切离开动作：
+// 留下 = 哈希退回编辑器路由且不重渲染（脏内容还在 DOM 里），离开 = 用户确认后再跳
+var editorGuard = null;
+var restoringHash = false;
+
+window.addEventListener('beforeunload', function (e) {
+  if (editorGuard && editorGuard.isDirty()) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
 function nav() {
   var hash = location.hash || '#/dashboard';
+  if (editorGuard && editorGuard.isDirty() && !restoringHash && hash !== editorGuard.route) {
+    var target = hash;
+    restoringHash = true;
+    location.hash = editorGuard.route; // 触发的 hashchange 由下一分支吞掉，编辑器 DOM 不动
+    editorGuard.ask().then(function (leave) {
+      restoringHash = false;
+      if (leave) {
+        editorGuard = null;
+        location.hash = target;
+      }
+    });
+    return;
+  }
+  if (restoringHash) {
+    restoringHash = false;
+    return;
+  }
   if (!loggedIn() && hash !== '#/login') {
     location.hash = '#/login';
     return;
@@ -602,6 +633,26 @@ function bindEditor(origSlug, post) {
 
   var ta = $('#f-body');
 
+  // ---------- 未保存保护：字段输入/选色/草稿开关/正文都算改动 ----------
+  var dirty = false;
+  function markDirty() {
+    dirty = true;
+  }
+  ['#f-title', '#f-desc', '#f-date', '#f-slug', '#f-tags'].forEach(function (id) {
+    $(id).addEventListener('input', markDirty);
+  });
+  $('#f-draft').addEventListener('change', markDirty);
+  ta.addEventListener('input', markDirty);
+  editorGuard = {
+    route: '#/editor/' + encodeURIComponent(origSlug),
+    isDirty: function () {
+      return dirty;
+    },
+    ask: function () {
+      return confirmModal('有未保存的修改', '页面内容还没保存，离开就找不回来了。确定要走吗？', '直接走');
+    },
+  };
+
   // ---------- 回退/恢复：自管历史栈（输入/工具栏插入统一可撤销） ----------
   var hist = [{ v: ta.value, s: 0, e: 0 }];
   var histIdx = 0;
@@ -677,6 +728,7 @@ function bindEditor(origSlug, post) {
   $('#f-accent').addEventListener('click', function (e) {
     var btn = e.target.closest('button[data-id]');
     if (!btn) return;
+    dirty = true;
     pickedAccent = btn.dataset.id;
     $('#f-accent').querySelectorAll('button').forEach(function (b) {
       b.classList.toggle('active', b === btn);
@@ -727,6 +779,7 @@ function bindEditor(origSlug, post) {
       },
     })
       .then(function () {
+        editorGuard = null; // 保存成功后的跳转不拦截
         toast('已保存，站点构建约需一分钟');
         location.hash = '#/posts';
       })
@@ -744,6 +797,7 @@ function bindEditor(origSlug, post) {
           if (!yes) return;
           api('DELETE', 'posts', { slug: origSlug })
             .then(function () {
+              editorGuard = null; // 删除成功后的跳转不拦截
               toast('已删除');
               location.hash = '#/posts';
             })
@@ -819,6 +873,11 @@ function bindMedia() {
       return f.type.startsWith('image/');
     }));
   });
+}
+
+// 粘贴与按钮委托是全局级监听：renderMedia 每次重渲染都会跑 bindMedia，
+// 若把这两个挂在其内会层层叠加（一次粘贴多路上传、确认弹窗叠层），只在启动时绑一次
+function bindMediaDelegates() {
   document.addEventListener('paste', function (e) {
     var items = Array.prototype.slice.call(e.clipboardData.items || []);
     var files = items
@@ -931,6 +990,7 @@ function uploadFiles(files) {
 // ---------- 启动 ----------
 
 app = $('#app');
+bindMediaDelegates();
 if (loggedIn()) {
   api('GET', 'session').catch(function () {});
 }

@@ -7,6 +7,7 @@
 - 工程：D:\zcodework\blog / Astro 5.18.2 纯静态博客 / 主题：Minecraft 紫粉美西螈
 - 进度：**阶段 1-5 ✅ + 吉祥物家族/加载动画/搜索/移动端 ✅ + 美西螈 CMS（EdgeOne Pages 版）✅**
   - **美西螈 CMS**：`public/admin/`（全中文三主题 SPA）+ `edge-functions/api/[[default]].js`（登录鉴权 + GitHub 代理；出站白名单仅 api.github.com；HMAC 签名 token 12h；连续错 5 次锁 15 分钟）+ `scripts/cms-dev.mjs`（本地环境 8090，`.env.local` 供凭据已 gitignore）。Sveltia 已移除，部署指南见 README-CMS.md（EdgeOne 控制台接仓库 + CMS_USERNAME/PASSWORD/SESSION_SECRET/GITHUB_TOKEN 四个环境变量）
+  - CMS 走查与修复（2026-10-25）：全功能 UI 走查后修掉两个 🔴——媒体库全局委托改为启动时绑一次（原每次渲染叠加导致重复上传/弹窗叠层，`bindMediaDelegates`）；编辑器未保存保护（脏状态跟踪 + nav 路由拦截 `editorGuard`/`restoringHash` + beforeunload，保存/删除成功后放行）。已验：留下内容不丢、确认走放行、干净态不拦、保存删除不拦、粘贴只传一张、弹窗单层。遗留 🟡：预览标题层级比线上深一级、后台搜索不搜正文、列表 N+1 API、防爆破无备用路径、欢迎语固定 admin、图片按钮占位符整体替换、标题/摘要不在撤销栈、删除无回收站
   - 草稿功能：schema `draft` 字段，前台首页/列表/getStaticPaths/搜索四处过滤（已验证）
   - CMS E2E 已验证（cms-test 分支真实读写后清理）：登录对错/401/防爆破、文章 CRUD、改名迁移、媒体上传删除、中文 commit、UTF-8 全链路无损。**坑：Git Bash curl 命令行传中文会 GBK 乱码，测试 JSON 必须用 `--data-binary @文件`；ghFetch 段内斜杠先拆分再编码（repo 名含 `/`）；onRequest 里 async 处理器必须 await，否则 rejection 绕过 try/catch**
   - wiki 核对结论（minecraft.wiki）：官方五色 = lucy 粉 / wild 棕 / gold 金 / cyan 青·**粉鳃** / blue 蓝（gold 是正式变体非废案）；唯一未进游戏的官方色是 **green 绿**（Minecraft Live 2020 预告片后被砍）→ 已作为彩蛋成员加入
