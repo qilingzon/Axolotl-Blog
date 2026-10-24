@@ -6,5 +6,5 @@
 - 除吉祥物资源外，站点零外部图片依赖：其余美术一律内联 SVG/CSS，新增图片资源需先征得同意。
 - 主题切换必须持久化（localStorage），且 `<head>` 内联引导脚本防闪烁逻辑不能移除。
 - 所有视觉改动完成后必须开 preview 截图过目（3 主题 × 关键页），截图作为验收证据。
-- 美西螈 CMS（`public/admin/` + `edge-functions/api/[[default]].js`）：全中文界面，改动需同步检查三主题；API 出站白名单（仅 api.github.com）与端点白名单表（app.js 的 ENDPOINTS）是安全底线，不得放宽；本地调试用 `node scripts/cms-dev.mjs`（凭据在 `.env.local`，已 gitignore，严禁提交或硬编码）。
+- 美西螈 CMS（`public/admin/` + `edge-functions/api/[[default]].js`）：全中文界面，改动需同步检查三主题；API 出站白名单（仅 api.github.com）与端点白名单表（app.js 的 ENDPOINTS）是安全底线，不得放宽。本地调试用 `node scripts/cms-dev.mjs`。**`.env.local` 存放登录凭据与 GitHub 令牌：任何会话不得读取、打印、复制其内容到聊天、日志或网络，不得提交仓库或硬编码进代码；确需更换凭据由用户自行编辑该文件。**
 - 文章内容放 `src/content/blog/*.md`，frontmatter 遵循 `src/content.config.ts` 的 schema（CMS 保存时会按 schema 序列化，改字段要同步 CMS 表单与 API 的 normalizeMeta）。
