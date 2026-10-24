@@ -15,7 +15,7 @@ draft: false
 
 ## 它长什么样
 
-![CMS 仪表盘：三张美西螈统计卡和最近文章列表](/assets/uploads/cms-dashboard-mvmo9p52.webp)
+![CMS 仪表盘：三张美西螈统计卡和最近文章列表](/assets/uploads/cms-dashboard-mvmssnnq.webp)
 
 架构很简单：前台还是纯静态 Astro；后台是一个全中文单页应用；API 跑在边缘函数上，本地调试用 `node scripts/cms-dev.mjs` 就能起同一套环境。所有写操作都会变成一条中文提交信息进仓库，比如「CMS: 新增《标题》」，站点随后自动重新构建——发布延迟约一分钟。
 
