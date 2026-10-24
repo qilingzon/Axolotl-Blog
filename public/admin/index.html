@@ -9,8 +9,9 @@
     <link rel="icon" href="/favicon.png" />
   </head>
   <body>
-    <!-- Sveltia CMS：git-based 无头 CMS，界面从 CDN 加载，内容直接读写 GitHub 仓库里的 markdown -->
-    <script src="https://unpkg.com/@sveltia/cms@^0.251.0/dist/sveltia-cms.js"></script>
+    <!-- Sveltia CMS：git-based 无头 CMS，内容直接读写 GitHub 仓库里的 markdown。
+         界面脚本自托管（vendor 自 @sveltia/cms@0.251.0），不走 unpkg——国内访问 CDN 不稳，且后台应离线可用。升级时替换本文件。 -->
+    <script src="/admin/sveltia-cms.js"></script>
     <noscript>内容管理后台需要启用 JavaScript。</noscript>
   </body>
 </html>
