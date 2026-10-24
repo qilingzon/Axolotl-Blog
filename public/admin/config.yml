@@ -1,0 +1,33 @@
+# Sveltia CMS 配置：字段与 src/content.config.ts 的 blog schema 一一对应。
+# CMS 保存 = 直接 commit 到 GitHub 仓库（branch 见下），推送后 Cloudflare Pages 自动重新构建。
+backend:
+  name: github
+  repo: qilingzon/Axolotl-Blog
+  branch: master
+
+# 上传的图片落库到 public/assets/uploads（仍在仓库内，不依赖外部图床）
+media_folder: public/assets/uploads
+public_folder: /assets/uploads
+
+collections:
+  - name: blog
+    label: 文章
+    label_singular: 文章
+    folder: src/content/blog
+    create: true
+    extension: md
+    format: frontmatter
+    # 文件名默认取自标题（Unicode 原样保留，中文标题生成中文文件名，Astro/Cloudflare 都能正常出路由）
+    editor:
+      preview: false
+    fields:
+      - { label: 标题, name: title, widget: string }
+      - { label: 摘要, name: description, widget: text }
+      - { label: 发布日期, name: pubDate, widget: datetime }
+      - { label: 标签, name: tags, widget: list, required: false, default: [] }
+      - label: 卡片美西螈
+        name: accent
+        widget: select
+        required: false
+        default: pink
+        options: [pink, purple, wild, cyan, gold, blue, green]
