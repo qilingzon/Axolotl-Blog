@@ -770,10 +770,59 @@ a.card:hover {
 
 /* ---------- 响应式 ---------- */
 
+/* ≤860px（含宽屏手机/平板竖屏）：顶栏改双行——第一行 logo+站名 与主题按钮（仅色点），
+   第二行导航三项等宽居中，避免单行拥挤贴边 */
+@media (max-width: 860px) {
+  .site-header__inner {
+    flex-wrap: wrap;
+    min-height: 0;
+    padding: 10px 0;
+    row-gap: 6px;
+  }
+
+  .site-logo {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .site-logo span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .site-nav {
+    order: 3;
+    width: 100%;
+    margin-left: 0;
+    justify-content: center;
+    gap: 2px;
+  }
+
+  .site-nav a {
+    flex: 1;
+    max-width: 132px;
+    text-align: center;
+    padding: 6px 0;
+  }
+
+  .theme-switcher {
+    padding: 9px;
+  }
+
+  .theme-switcher__dot {
+    width: 14px;
+    height: 14px;
+  }
+
+  .theme-switcher__name {
+    display: none;
+  }
+}
+
 @media (max-width: 720px) {
   .site-header__inner {
     gap: 10px;
-    min-height: 56px;
   }
 
   .site-logo {
@@ -781,17 +830,7 @@ a.card:hover {
   }
 
   .site-nav a {
-    padding: 5px 8px;
     font-size: 14px;
-  }
-
-  .theme-switcher {
-    padding: 6px 10px;
-    font-size: 12px;
-  }
-
-  .theme-switcher__name {
-    display: none;
   }
 
   .container {
