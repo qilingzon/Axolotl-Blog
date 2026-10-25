@@ -293,6 +293,7 @@ var app = null;
 // 留下 = 哈希退回编辑器路由且不重渲染（脏内容还在 DOM 里），离开 = 用户确认后再跳
 var editorGuard = null;
 var restoringHash = false;
+var lastSavedAt = 0; // 最近一次保存成功的时间（跨编辑器实例；用于「看线上页面」构建空窗期提示）
 
 window.addEventListener('beforeunload', function (e) {
   if (editorGuard && editorGuard.isDirty()) {
@@ -1496,7 +1497,7 @@ function renderEditor(slug) {
       var accent = post ? post.accent : 'pink';
       var html =
         '<div class="page-head"><h1>' + (isNew ? '写新文章' : '编辑文章') + '</h1><span class="spacer"></span>' +
-        (isNew ? '' : '<a class="btn btn--ghost" href="/blog/' + encodeURIComponent(slug) + '/" target="_blank" rel="noopener">看线上页面</a>') +
+        (isNew ? '' : '<a class="btn btn--ghost" id="view-live-btn" href="/blog/' + encodeURIComponent(slug) + '/" target="_blank" rel="noopener">看线上页面</a>') +
         '</div>' +
         '<div class="editor-grid">' +
         '<div class="card">' +
@@ -1881,6 +1882,12 @@ function bindEditor(origSlug, post) {
         renderEditor(origSlug);
       });
     });
+    // 刚保存完线上还在构建（约 1 分钟），此刻点开多半是 404——提前说一句免得小白慌
+    $('#view-live-btn').addEventListener('click', function () {
+      if (lastSavedAt && Date.now() - lastSavedAt < 120000) {
+        toast('线上正在构建（约 1 分钟）：现在点开若是 404，稍等刷新就好');
+      }
+    });
   }
 
   $('#save-btn').addEventListener('click', function () {
@@ -1913,6 +1920,7 @@ function bindEditor(origSlug, post) {
     })
       .then(function () {
         editorGuard = null; // 保存成功后的跳转不拦截
+        lastSavedAt = Date.now();
         localStorage.removeItem('cms-autodraft');
         toast('已保存，站点构建约需一分钟');
         location.hash = '#/posts';
