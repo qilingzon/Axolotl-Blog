@@ -53,7 +53,8 @@ function bytesToB64(bytes) {
 }
 
 function b64ToBytes(b64) {
-  const bin = atob(b64);
+  // GitHub contents API 的 base64 每 60 字符夹一个换行，部分边缘运行时的 atob 不容忍空白
+  const bin = atob(String(b64).replace(/\s+/g, ''));
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
