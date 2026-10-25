@@ -115,7 +115,8 @@ function openHistoryModal(slug, onRolledBack) {
     mask.remove();
   }
   function onKey(e) {
-    if (e.key === 'Escape') close();
+    // 上层还叠着别的弹窗（如回滚确认）时，Esc 只归最上层处理，避免连锁关闭
+    if (e.key === 'Escape' && document.querySelectorAll('.modal-mask').length <= 1) close();
   }
   function fmtDate(iso) {
     var d = new Date(iso);
@@ -838,7 +839,7 @@ function blocksToMarkdown(blocks) {
       return md;
     }
     return '';
-  }).filter(function (s) { return s !== ''; });
+  }).filter(function (s) { return s.trim() !== ''; });
   return parts.join('\n\n');
 }
 
@@ -911,7 +912,11 @@ function createBlockEditor(deps) {
         '">' + esc(b.text || '') + '</textarea>';
     }
     if (b.type === 'h2' || b.type === 'h3' || b.type === 'h4') {
-      return '<input type="text" data-f="text" value="' + esc(b.text || '') + '" placeholder="标题文字">';
+      return (
+        '<input type="text" data-f="text" value="' + esc(b.text || '') + '" placeholder="' +
+        (b.type === 'h2' ? '大标题文字' : b.type === 'h3' ? '小标题文字' : '小小标题文字') +
+        '">'
+      );
     }
     if (b.type === 'list') {
       var lines = b.items.map(function (it) { return (it.level ? '  ' : '') + it.text; });
@@ -1023,6 +1028,79 @@ function createBlockEditor(deps) {
     else if (f === 'taskdone') b.items[Number(t.dataset.i)].done = t.checked;
     else if (f === 'cell') b.rows[Number(t.dataset.r)][Number(t.dataset.c)] = t.value;
     changed('input');
+  });
+
+  // ---------- 键盘流：像记事本一样自然 ----------
+  // Enter 在段落光标处一分为二（新块同类型）；标题里回车 = 下面写新段落；
+  // 空块退格直接删掉并落回上一块；↑/↓ 到边界时在块之间移动。
+  root.addEventListener('keydown', function (e) {
+    var t = e.target;
+    if (!t.closest || e.isComposing) return; // 中文输入法选词的回车不拦
+    var card = t.closest('.blk');
+    if (!card) return;
+    var idx = Number(card.dataset.idx);
+    var b = blocks[idx];
+    if (!b) return;
+    var isText =
+      (t.tagName === 'TEXTAREA' && t.dataset.f === 'text') ||
+      (t.tagName === 'INPUT' && t.dataset.f === 'text');
+    if (!isText) return;
+    var isHeading = b.type === 'h2' || b.type === 'h3' || b.type === 'h4';
+
+    if (e.key === 'Enter' && !e.shiftKey) {
+      if (b.type === 'p') {
+        e.preventDefault();
+        var cut = t.selectionStart;
+        var head = t.value.slice(0, cut);
+        var tail = t.value.slice(t.selectionEnd);
+        b.text = head;
+        blocks.splice(idx + 1, 0, { type: 'p', text: tail });
+        renderAll(idx + 1);
+        var nel = root.querySelector('.blk[data-idx="' + (idx + 1) + '"] textarea[data-f=text]');
+        if (nel && nel.setSelectionRange) nel.setSelectionRange(0, 0);
+        changed('structure');
+        return;
+      }
+      if (isHeading) {
+        e.preventDefault();
+        blocks.splice(idx + 1, 0, { type: 'p', text: '' });
+        renderAll(idx + 1);
+        changed('structure');
+        return;
+      }
+      return; // 引用/代码/原始 Markdown：换行本来就是内容
+    }
+
+    if (e.key === 'Backspace') {
+      var atStart = t.selectionStart === 0 && t.selectionEnd === 0;
+      if (atStart && isBlockEmpty(b) && blocks.length > 1) {
+        e.preventDefault();
+        var prevIdx = idx > 0 ? idx - 1 : 0;
+        blocks.splice(idx, 1);
+        ensureNonEmpty();
+        renderAll(prevIdx);
+        changed('structure');
+        return;
+      }
+    }
+
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.shiftKey) {
+      var toPrev = e.key === 'ArrowUp';
+      var edge = toPrev
+        ? t.selectionStart === 0 && t.selectionEnd === 0
+        : t.selectionStart === t.value.length && t.selectionEnd === t.value.length;
+      if (!edge) return;
+      if (toPrev && idx === 0) return;
+      if (!toPrev && idx === blocks.length - 1) return;
+      e.preventDefault();
+      var nidx = toPrev ? idx - 1 : idx + 1;
+      renderAll(nidx);
+      if (!toPrev) {
+        // renderAll 默认把光标放到末尾；向下跳应该落到下一块开头
+        var nel2 = root.querySelector('.blk[data-idx="' + nidx + '"] textarea[data-f=text], .blk[data-idx="' + nidx + '"] input[type=text]');
+        if (nel2 && nel2.setSelectionRange) nel2.setSelectionRange(0, 0);
+      }
+    }
   });
   root.addEventListener('change', function (e) {
     if (e.target.dataset && e.target.dataset.f === 'taskdone') {
@@ -1443,6 +1521,8 @@ function renderEditor(slug) {
         '<button type="button" data-mode="easy" title="像搭积木一样写，不用学任何符号">小白写作</button>' +
         '<button type="button" data-mode="pro" title="直接写 Markdown，左右分栏实时预览">进阶写作</button>' +
         '</div>' +
+        '<button type="button" class="ed-topbar__btn" id="hist-undo-btn" title="回退上一步（Ctrl+Z）" disabled>↩ 回退</button>' +
+        '<button type="button" class="ed-topbar__btn" id="hist-redo-btn" title="恢复（Ctrl+Y）" disabled>↪ 恢复</button>' +
         '<span class="word-count" id="word-count"></span>' +
         (isNew ? '' : '<button type="button" class="ed-topbar__btn" id="hist-btn" title="这篇文章的修改历史，可以回到任意一版">历史</button>') +
         '<span class="spacer"></span>' +
@@ -1542,6 +1622,10 @@ function bindEditor(origSlug, post) {
   function syncHistButtons() {
     undoBtn.disabled = histIdx <= 0;
     redoBtn.disabled = histIdx >= hist.length - 1;
+    var uBtn = $('#hist-undo-btn');
+    var rBtn = $('#hist-redo-btn');
+    if (uBtn) uBtn.disabled = undoBtn.disabled;
+    if (rBtn) rBtn.disabled = redoBtn.disabled;
   }
 
   function pushHist(forceValue) {
@@ -1585,6 +1669,12 @@ function bindEditor(origSlug, post) {
     stepHist(-1);
   });
   redoBtn.addEventListener('click', function () {
+    stepHist(1);
+  });
+  $('#hist-undo-btn').addEventListener('click', function () {
+    stepHist(-1);
+  });
+  $('#hist-redo-btn').addEventListener('click', function () {
     stepHist(1);
   });
   ta.addEventListener('keydown', function (e) {
@@ -1666,7 +1756,10 @@ function bindEditor(origSlug, post) {
 
   function updateWordCount() {
     var n = easyMode ? blk.countChars() : ta.value.replace(/\s/g, '').length;
-    $('#word-count').textContent = n ? '约 ' + n + ' 字' : '';
+    // 阅读时长按中文 400 字/分钟估算，至少 1 分钟
+    $('#word-count').textContent = n
+      ? '约 ' + n + ' 字 · 大概 ' + Math.max(1, Math.round(n / 400)) + ' 分钟读完'
+      : '';
   }
 
   function applyMode() {
@@ -1784,6 +1877,7 @@ function bindEditor(origSlug, post) {
     $('#hist-btn').addEventListener('click', function () {
       openHistoryModal(origSlug, function () {
         editorGuard = null; // 回滚是主动丢弃当前修改，重载不拦截
+        try { localStorage.removeItem('cms-autodraft'); } catch (e) {} // 刚被回滚丢弃的暂存不再弹「恢复草稿」提示
         renderEditor(origSlug);
       });
     });

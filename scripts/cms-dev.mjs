@@ -11,6 +11,19 @@ const DIST = join(ROOT, 'dist');
 // 默认 8792：8090 常被本机反代等工具占用（127.0.0.1:8090 抢答导致请求时通时不通），换冷门端口
 const PORT = Number(process.env.PORT || 8792);
 
+// 本机若装有 Watt Toolkit(SteamTools)/安全软件等 HTTPS 加速层，GitHub 证书会被换成其私有 CA，
+// Node 自带 CA 集不认（fetch failed: UNABLE_TO_VERIFY_LEAF_SIGNATURE），而 gh/浏览器走系统证书库正常。
+// 这里带上系统证书库重启自身（仅本地开发服务器；线上 EdgeOne 运行时不受影响）。
+if (!process.env.NODE_USE_SYSTEM_CA) {
+  const { spawn } = await import('node:child_process');
+  const child = spawn(process.execPath, [fileURLToPath(import.meta.url)], {
+    env: { ...process.env, NODE_USE_SYSTEM_CA: '1' },
+    stdio: 'inherit',
+  });
+  child.on('exit', (c) => process.exit(c ?? 0));
+  await new Promise(() => {}); // 父进程驻守等待子进程，绝不能再往下跑出第二个服务器
+}
+
 // 读取 .env.local（KEY=VALUE 每行一条）
 const env = { ...process.env };
 const envFile = join(ROOT, '.env.local');
