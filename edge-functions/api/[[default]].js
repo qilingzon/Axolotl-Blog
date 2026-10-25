@@ -406,7 +406,11 @@ async function handleListPosts() {
       name,
       expr: `${CFG.branch()}:${POSTS_DIR}`,
     });
-    const entries = (data.repository.object && data.repository.object.entries) || [];
+    // object 为 null = 分支或目录不存在（不是空目录）——直接说清楚，别伪装成"池塘还空着"
+    if (!data.repository || !data.repository.object) {
+      return fail('文章目录读不到：CMS_BRANCH 指向的分支不存在，请检查配置', 502);
+    }
+    const entries = data.repository.object.entries || [];
     posts = entries
       .filter((e) => e.object && e.name.endsWith('.md'))
       .map((e) => postFromText(e.name, e.object.oid, e.object.text));
