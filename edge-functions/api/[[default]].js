@@ -239,7 +239,7 @@ export async function onRequest(context) {
     if (path === '/api/login' && method === 'POST') return await handleLogin(request);
     if (!envConfigured()) {
       return fail(
-        'CMS 尚未配置：请在 EdgeOne 项目环境变量里设置 CMS_USERNAME / CMS_PASSWORD / CMS_SESSION_SECRET / CMS_GITHUB_TOKEN',
+        'CMS 尚未配置：请在 EdgeOne 项目环境变量里设置 CMS_USERNAME / CMS_PASSWORD / CMS_SESSION_SECRET / CMS_GITHUB_TOKEN（打开 /admin/setup.html 部署助手，点几下就能生成这 4 个值）',
         503
       );
     }
@@ -271,7 +271,7 @@ async function handleLogin(request) {
   if (tooManyFails()) return fail('失败次数太多，请 15 分钟后再试', 429);
   if (!envConfigured()) {
     return fail(
-      'CMS 尚未配置：请在 EdgeOne 项目环境变量里设置 CMS_USERNAME / CMS_PASSWORD / CMS_SESSION_SECRET / CMS_GITHUB_TOKEN',
+      'CMS 尚未配置：请在 EdgeOne 项目环境变量里设置 CMS_USERNAME / CMS_PASSWORD / CMS_SESSION_SECRET / CMS_GITHUB_TOKEN（打开 /admin/setup.html 部署助手，点几下就能生成这 4 个值）',
       503
     );
   }

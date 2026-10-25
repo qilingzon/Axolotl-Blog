@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>美西螈 CMS · 部署助手</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, 'Microsoft YaHei', sans-serif; background: #fdf3f7; color: #4a3b41; line-height: 1.6; padding: 16px; }
+  main { max-width: 620px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 8px 0 4px; }
+  h2 { font-size: 16px; margin: 22px 0 8px; color: #c2557e; }
+  .sub { color: #9b8791; font-size: 14px; }
+  .lock { background: #fff; border: 1px solid #f0cdd9; border-radius: 10px; padding: 10px 12px; font-size: 13px; margin: 12px 0 4px; }
+  label { display: block; font-size: 14px; font-weight: 600; margin: 14px 0 4px; }
+  input { width: 100%; padding: 11px 12px; border: 1.5px solid #e8c9d4; border-radius: 10px; font-size: 16px; background: #fff; color: inherit; }
+  input:focus { outline: 2px solid #e58fb1; border-color: transparent; }
+  .row { display: flex; gap: 8px; }
+  .row input { flex: 1; min-width: 0; }
+  button, .btn { display: inline-block; padding: 11px 16px; border: 0; border-radius: 10px; background: #e58fb1; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; text-align: center; }
+  button.ghost { background: #fff; color: #c2557e; border: 1.5px solid #e8c9d4; }
+  ol.tips { margin: 8px 0 0 20px; font-size: 14px; }
+  .out { background: #fff; border: 1.5px dashed #e8c9d4; border-radius: 12px; padding: 6px 12px; margin-top: 8px; }
+  .line { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid #f6e3ea; flex-wrap: wrap; }
+  .line:last-child { border-bottom: 0; }
+  .line code { font-family: Consolas, monospace; font-size: 13px; background: #fdf3f7; padding: 6px 8px; border-radius: 8px; word-break: break-all; flex: 1; min-width: 200px; }
+  .line b { font-size: 12px; color: #9b8791; width: 150px; flex-shrink: 0; }
+  .copy { padding: 7px 12px; font-size: 13px; flex-shrink: 0; }
+  .ok { color: #2e8b57; }
+  .warn { color: #c2557e; font-size: 13px; margin-top: 10px; }
+  .next { margin: 10px 0 0 20px; font-size: 14px; }
+  .next li { margin: 4px 0; }
+  footer { margin: 26px 0 10px; font-size: 12px; color: #b9a6af; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🐟 美西螈 CMS · 部署助手</h1>
+  <p class="sub">填一填、点一点，4 个环境变量就齐了。手机电脑都能用。</p>
+  <div class="lock">🔒 本页面<b>没有任何网络请求</b>，断网也能用（可开飞行模式验证）；填的内容只显示在这块屏幕上，配完建议关闭页面。</div>
+
+  <h2>① 定用户名和密码</h2>
+  <label>后台用户名</label>
+  <input id="u" value="axolotl-admin" autocomplete="off">
+  <label>登录密码（至少 8 位，别带空格）</label>
+  <input id="p" autocomplete="off" placeholder="想一个好记又不好猜的">
+
+  <h2>② 登录密钥（不用想，点一下就有）</h2>
+  <div class="row">
+    <input id="s" readonly>
+    <button class="ghost" id="regen" type="button">🎲 换一个</button>
+  </div>
+
+  <h2>③ GitHub 令牌（让 CMS 能帮你存文章）</h2>
+  <a class="btn" target="_blank" rel="noopener" href="https://github.com/settings/tokens/new?scopes=repo&description=Axolotl-CMS">点我去 GitHub 生成（权限已帮你勾好）</a>
+  <ol class="tips">
+    <li>登录 GitHub（手机浏览器也可以）</li>
+    <li>拉到页面最底部，点绿色按钮「Generate token」</li>
+    <li>复制那串 <code>ghp_</code> 开头的令牌，粘贴到下面</li>
+  </ol>
+  <label>粘贴令牌</label>
+  <input id="t" autocomplete="off" placeholder="ghp_……………………">
+
+  <h2>④ 复制这 4 行，去 EdgeOne 粘贴</h2>
+  <div class="out" id="out"></div>
+  <p class="warn" id="warn"></p>
+  <p style="margin-top:10px"><button class="ghost" id="copyAll" type="button">📋 一键复制全部 4 行</button></p>
+
+  <h2>⑤ 去哪粘贴？</h2>
+  <ol class="next">
+    <li>打开腾讯云 EdgeOne Pages 控制台 → 你的项目 → <b>设置 → 环境变量</b></li>
+    <li>逐条添加：变量名照左边（如 <code>CMS_USERNAME</code>），值粘右边</li>
+    <li>保存后点 <b>「重新部署」</b>，等 1–2 分钟 → 打开 <code>你的域名/admin/</code> 登录 🎉</li>
+  </ol>
+
+  <footer>美西螈 CMS 部署助手 · 纯本机页面 · 建议配完即关</footer>
+</main>
+<script>
+'use strict';
+var $ = function (id) { return document.getElementById(id); };
+
+function genSecret() {
+  var bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  $('s').value = Array.prototype.map.call(bytes, function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+}
+genSecret();
+$('regen').addEventListener('click', genSecret);
+
+function items() {
+  return [
+    { k: 'CMS_USERNAME', v: $('u').value.trim(), tip: '用户名' },
+    { k: 'CMS_PASSWORD', v: $('p').value.trim(), tip: '密码（至少 8 位、不带空格）' },
+    { k: 'CMS_SESSION_SECRET', v: $('s').value.trim(), tip: '' },
+    { k: 'CMS_GITHUB_TOKEN', v: $('t').value.trim(), tip: '令牌（ghp_ 开头）' },
+  ];
+}
+
+function render() {
+  var list = items();
+  var missing = list.filter(function (it) { return !it.v || (it.k === 'CMS_PASSWORD' && (it.v.length < 8 || /\s/.test(it.v))); });
+  var out = $('out');
+  out.innerHTML = '';
+  list.forEach(function (it) {
+    var row = document.createElement('div');
+    row.className = 'line';
+    row.innerHTML = '<b>' + it.k + '</b><code></code><button class="copy" type="button">复制</button>';
+    row.querySelector('code').textContent = it.v || '（' + (it.tip || '待生成') + '）';
+    row.querySelector('.copy').addEventListener('click', function () { copyText(it.v, this); });
+    out.appendChild(row);
+  });
+  $('warn').textContent = missing.length
+    ? '⚠ 还差：' + missing.map(function (m) { return m.tip || m.k; }).join('、')
+    : '✅ 齐 了！按下面第 ⑤ 步去粘贴。';
+  $('copyAll').disabled = !!missing.length;
+  $('copyAll').textContent = missing.length ? '📋 填齐后可一键复制' : '📋 一键复制全部 4 行';
+}
+['u', 'p', 't'].forEach(function (id) { $(id).addEventListener('input', render); });
+render();
+
+function copyText(text, btn) {
+  if (!text) return;
+  var done = function () {
+    var old = btn.textContent;
+    btn.textContent = '✓ 已复制';
+    btn.classList.add('ok');
+    setTimeout(function () { btn.textContent = old; btn.classList.remove('ok'); }, 1400);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(function () { fallback(text, done); });
+  } else {
+    fallback(text, done);
+  }
+}
+function fallback(text, done) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); done(); } catch (e) { alert('复制失败，请长按手动复制：\n' + text); }
+  document.body.removeChild(ta);
+}
+$('copyAll').addEventListener('click', function () {
+  var lines = items().map(function (it) { return it.k + '=' + it.v; }).join('\n');
+  copyText(lines, this);
+});
+</script>
+</body>
+</html>
