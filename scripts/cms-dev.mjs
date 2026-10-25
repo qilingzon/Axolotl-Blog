@@ -7,7 +7,8 @@ import { join, extname } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const DIST = join(ROOT, 'dist');
+// 博客仓构建后用 dist/；独立仓（Axolotl-CMS）没有构建步骤，直接服务 public/——同一份脚本两仓通用
+const DIST = existsSync(join(ROOT, 'dist')) ? join(ROOT, 'dist') : join(ROOT, 'public');
 // 默认 8792：8090 常被本机反代等工具占用（127.0.0.1:8090 抢答导致请求时通时不通），换冷门端口
 const PORT = Number(process.env.PORT || 8792);
 
@@ -84,12 +85,24 @@ createServer(async (req, res) => {
       return;
     }
     // 静态文件：目录 → index.html；不存在 → 404.html 兜底
+    if (url.pathname === '/' && !existsSync(join(DIST, 'index.html'))) {
+      // 根目录没有首页（独立仓形态）：直接送到后台
+      res.writeHead(302, { Location: '/admin/' });
+      res.end();
+      return;
+    }
     let file = join(DIST, decodeURIComponent(url.pathname));
     let st = existsSync(file) ? statSync(file) : null;
     if (st && st.isDirectory()) file = join(file, 'index.html');
     else if (!st) {
       const pretty = join(DIST, url.pathname.replace(/\/$/, ''), 'index.html');
       file = existsSync(pretty) ? pretty : join(DIST, '404.html');
+    }
+    if (!existsSync(file)) {
+      // 404 页也不存在（独立仓 public/ 没带）：纯文本兜底，别让服务器 500
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('404：这个地址不存在。后台在 /admin/');
+      return;
     }
     const data = await readFile(file);
     res.writeHead(200, { 'Content-Type': MIME[extname(file)] || 'application/octet-stream' });
