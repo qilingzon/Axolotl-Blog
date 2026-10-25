@@ -294,6 +294,30 @@ select:focus {
   color: var(--text-muted);
 }
 
+a.stat {
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+a.stat:hover {
+  transform: translateY(-3px);
+}
+
+.draft-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.draft-filter input {
+  width: auto;
+  margin: 0;
+}
+
 /* ---------- 登录页 ---------- */
 
 .login {
@@ -605,6 +629,13 @@ select:focus {
   margin: 0 6px;
   vertical-align: middle;
   background: var(--border);
+}
+
+.md-toolbar__hint {
+  margin-left: auto;
+  align-self: center;
+  font-size: 12.5px;
+  color: var(--text-muted);
 }
 
 .split {

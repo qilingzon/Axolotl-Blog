@@ -206,7 +206,7 @@ function nav() {
   }
   var parts = hash.slice(2).split('/');
   if (parts[0] === 'editor' && parts[1]) renderEditor(decodeURIComponent(parts[1]));
-  else if (parts[0] === 'posts') renderPosts();
+  else if (parts[0] === 'posts') renderPosts(parts[1]);
   else if (parts[0] === 'media') renderMedia();
   else if (parts[0] === 'login') renderLogin();
   else renderDashboard();
@@ -321,9 +321,9 @@ function renderDashboard() {
         '<div class="page-head"><h1>仪表盘</h1><span class="spacer"></span>' +
         '<a class="btn" href="#/editor/new">写新文章</a></div>' +
         '<div class="stats">' +
-        statCard(posts.length, '篇文章', '/assets/axolotl-cyan.png') +
-        statCard(Object.keys(tags).length, '个标签', '/assets/axolotl-gold.png') +
-        statCard(drafts, '篇草稿', '/assets/axolotl-wild.png') +
+        statCard(posts.length, '篇文章', '/assets/axolotl-cyan.png', '#/posts', '看全部文章') +
+        statCard(Object.keys(tags).length, '个标签', '/assets/axolotl-gold.png', '#/posts/tags', '按标签筛选') +
+        statCard(drafts, '篇草稿', '/assets/axolotl-wild.png', '#/posts/draft', '只看草稿') +
         '</div>' +
         '<div class="card"><h3 style="margin-top:0">最近文章</h3>' +
         (latest.length
@@ -337,11 +337,13 @@ function renderDashboard() {
     });
 }
 
-function statCard(num, label, img) {
-  return (
-    '<div class="stat"><img src="' + img + '" alt=""><div><div class="stat__num">' +
-    num + '</div><div class="stat__label">' + esc(label) + '</div></div></div>'
-  );
+function statCard(num, label, img, href, tip) {
+  var inner =
+    '<img src="' + img + '" alt=""><div><div class="stat__num">' +
+    num + '</div><div class="stat__label">' + esc(label) + '</div></div>';
+  return href
+    ? '<a class="stat stat--link" href="' + href + '" title="' + esc(tip || '') + '">' + inner + '</a>'
+    : '<div class="stat">' + inner + '</div>';
 }
 
 function postRowHtml(p) {
@@ -359,7 +361,7 @@ function postRowHtml(p) {
 
 // ---------- 文章列表 ----------
 
-function renderPosts() {
+function renderPosts(mode) {
   renderShell('posts', loadingTip('文章清单搬运中……'));
   api('GET', 'posts')
     .then(function (data) {
@@ -378,6 +380,7 @@ function renderPosts() {
         '<select id="post-tag" style="width:130px"><option value="">全部标签</option>' +
         allTags.map(function (t) { return '<option>' + esc(t) + '</option>'; }).join('') +
         '</select>' +
+        '<label class="draft-filter" title="只显示存为草稿的文章"><input type="checkbox" id="post-draft" ' + (mode === 'draft' ? 'checked' : '') + '>只看草稿</label>' +
         '<a class="btn" href="#/editor/new">写新文章</a></div>' +
         '<div id="post-list">' + posts.map(postRowHtml).join('') + '</div>';
       renderShell('posts', html);
@@ -385,6 +388,7 @@ function renderPosts() {
       function refresh() {
         var kw = $('#post-search').value.trim().toLowerCase();
         var tag = $('#post-tag').value;
+        var draftOnly = $('#post-draft').checked;
         var filtered = posts.filter(function (p) {
           var hitKw =
             !kw ||
@@ -394,7 +398,8 @@ function renderPosts() {
               return t.toLowerCase().includes(kw);
             });
           var hitTag = !tag || (p.tags || []).includes(tag);
-          return hitKw && hitTag;
+          var hitDraft = !draftOnly || p.draft;
+          return hitKw && hitTag && hitDraft;
         });
         listEl.innerHTML = filtered.length
           ? filtered.map(postRowHtml).join('')
@@ -402,6 +407,12 @@ function renderPosts() {
       }
       $('#post-search').addEventListener('input', refresh);
       $('#post-tag').addEventListener('change', refresh);
+      $('#post-draft').addEventListener('change', refresh);
+      refresh();
+      if (mode === 'tags') {
+        var sel = $('#post-tag');
+        if (sel) sel.focus();
+      }
     })
     .catch(function (err) {
       renderShell('posts', '<div class="empty-tip">' + esc(err.message) + '</div>');
@@ -599,12 +610,13 @@ function renderEditor(slug) {
         '<button type="button" data-hist="undo" title="回退（Ctrl+Z）" disabled>↩ 回退</button>' +
         '<button type="button" data-hist="redo" title="恢复（Ctrl+Y）" disabled>↪ 恢复</button>' +
         '<span class="md-toolbar__sep"></span>' +
-        mdBtn('H2', '标题', '## ', '') + mdBtn('H3', '小标题', '### ', '') +
-        mdBtn('B', '加粗', '**', '**') + mdBtn('I', '斜体', '*', '*') +
-        mdBtn('链接', '插入链接', '[', '](https://)') +
-        mdBtn('图片', '插入图片', '![', '](/assets/uploads/)') +
+        mdBtn('标题', '把这一行变成大标题（## ）', '## ', '') + mdBtn('小标题', '把这一行变成小标题（### ）', '### ', '') +
+        mdBtn('加粗', '把选中的文字加粗', '**', '**') + mdBtn('斜体', '把选中的文字变斜体', '*', '*') +
+        mdBtn('链接', '给选中文字加个网址', '[', '](https://)') +
+        mdBtn('图片', '插入一张图片', '![', '](/assets/uploads/)') +
         mdBtn('引用', '引用块', '> ', '') + mdBtn('代码', '代码块', '\n```\n', '\n```\n') +
         mdBtn('表格', '表格', '\n| 列1 | 列2 |\n| --- | --- |\n| ', ' | |\n') +
+        '<span class="md-toolbar__hint">小白须知：先选中文字再点按钮 · 写错了点 ↩ 回退</span>' +
         '</div>' +
         '<div class="split">' +
         '<textarea id="f-body" placeholder="在这里写正文……（支持 Markdown）">' + esc(post ? post.body : '') + '</textarea>' +
