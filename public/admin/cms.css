@@ -650,6 +650,16 @@ select:focus {
   margin: 1em 0 0.3em;
 }
 
+.md-body h1 {
+  font-size: 1.5em;
+  margin: 1.3em 0 0.5em;
+}
+
+.md-body h4 {
+  font-size: 1em;
+  margin: 0.9em 0 0.3em;
+}
+
 .md-body code {
   font-family: 'Cascadia Code', Consolas, monospace;
   font-size: 0.9em;

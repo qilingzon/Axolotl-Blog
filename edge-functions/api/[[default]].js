@@ -198,6 +198,34 @@ function repoSegments(...rest) {
   return ['repos', CFG.repo(), ...rest];
 }
 
+/**
+ * GraphQL 查询（端点同为 api.github.com，白名单不变）：一次请求取回目录下全部
+ * 文件名与正文。REST 目录列表不带 content，逐篇 GET 是 1+N 次请求。
+ * 仅用于固定拼装的只读查询，变量经参数化传入。
+ */
+async function ghGraphQL(query, variables) {
+  const url = `${GH_API}/graphql`;
+  assertOutboundAllowed(url);
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${CFG.token()}`,
+      'Content-Type': 'application/json',
+      'User-Agent': 'axolotl-cms',
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data || data.errors) {
+    const msg =
+      data && data.errors && data.errors[0] ? data.errors[0].message : `GitHub GraphQL ${res.status}`;
+    const err = new Error(msg);
+    err.status = res.status;
+    throw err;
+  }
+  return data.data;
+}
+
 // ---------- 路由入口 ----------
 
 export async function onRequest(context) {
@@ -263,7 +291,9 @@ async function handleLogin(request) {
     return json({ token: await issueToken(String(username)), expiresAt: Date.now() + TOKEN_TTL_MS });
   }
   recordFail();
-  return fail('用户名或密码不正确', 401);
+  // 第 5 次失败即触发锁定窗口，直接告知锁定；其余次数预告剩余额度
+  if (tooManyFails()) return fail('失败次数太多，请 15 分钟后再试', 429);
+  return fail(`用户名或密码不正确，还可尝试 ${5 - loginFails.count} 次`, 401);
 }
 
 // ---------- frontmatter 解析/序列化（仅覆盖本站扁平 schema） ----------
@@ -341,21 +371,43 @@ function normalizeMeta(raw) {
 
 // ---------- 文章接口 ----------
 
+const LIST_POSTS_QUERY = `query($owner:String!,$name:String!,$expr:String!){
+  repository(owner:$owner,name:$name){
+    object(expression:$expr){
+      ... on Tree { entries { name object { ... on Blob { oid text } } } }
+    }
+  }
+}`;
+
+function postFromText(name, sha, text) {
+  const { meta, body } = parseFrontmatter(text || '');
+  return { slug: name.replace(/\.md$/, ''), sha, ...normalizeMeta(meta), body };
+}
+
 async function handleListPosts() {
-  const files = await ghFetch(repoSegments('contents', POSTS_DIR));
-  const mdFiles = files.filter((f) => f.type === 'file' && f.name.endsWith('.md'));
-  const posts = await Promise.all(
-    mdFiles.map(async (f) => {
-      const item = await ghFetch(repoSegments('contents', f.path));
-      const text = dec.decode(b64ToBytes(item.content || ''));
-      const { meta } = parseFrontmatter(text);
-      return {
-        slug: f.name.replace(/\.md$/, ''),
-        sha: f.sha,
-        ...normalizeMeta(meta),
-      };
-    })
-  );
+  let posts = null;
+  try {
+    const [owner, name] = String(CFG.repo()).split('/');
+    const data = await ghGraphQL(LIST_POSTS_QUERY, {
+      owner,
+      name,
+      expr: `${CFG.branch()}:${POSTS_DIR}`,
+    });
+    const entries = (data.repository.object && data.repository.object.entries) || [];
+    posts = entries
+      .filter((e) => e.object && e.name.endsWith('.md'))
+      .map((e) => postFromText(e.name, e.object.oid, e.object.text));
+  } catch {
+    // 回退：REST 目录 + 逐篇 GET（GraphQL 不可用时后台照常工作）
+    const files = await ghFetch(repoSegments('contents', POSTS_DIR));
+    const mdFiles = files.filter((f) => f.type === 'file' && f.name.endsWith('.md'));
+    posts = await Promise.all(
+      mdFiles.map(async (f) => {
+        const item = await ghFetch(repoSegments('contents', f.path));
+        return postFromText(f.name, item.sha, dec.decode(b64ToBytes(item.content || '')));
+      })
+    );
+  }
   posts.sort((a, b) => String(b.pubDate).localeCompare(String(a.pubDate)));
   return json({ posts });
 }

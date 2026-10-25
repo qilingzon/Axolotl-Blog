@@ -81,17 +81,21 @@ function confirmModal(title, text, okLabel) {
       '<button class="btn btn--danger" data-act="yes">' +
       esc(okLabel || '确定') +
       '</button></div></div>';
+    function done(val) {
+      document.removeEventListener('keydown', onKey);
+      mask.remove();
+      resolve(val);
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') done(false); // Esc 等同取消
+    }
     mask.addEventListener('click', function (e) {
       var act = e.target.getAttribute && e.target.getAttribute('data-act');
-      if (act) {
-        mask.remove();
-        resolve(act === 'yes');
-      } else if (e.target === mask) {
-        mask.remove();
-        resolve(false);
-      }
+      if (act) done(act === 'yes');
+      else if (e.target === mask) done(false);
     });
     document.body.appendChild(mask);
+    document.addEventListener('keydown', onKey);
   });
 }
 
@@ -267,6 +271,7 @@ function renderLogin() {
     var btn = $('#login-form button[type=submit]');
     btn.disabled = true;
     btn.textContent = '正在开门……';
+    var userInput = String(this.username.value || '').trim();
     api('POST', 'login', {
       body: {
         username: this.username.value,
@@ -276,7 +281,7 @@ function renderLogin() {
       .then(function (data) {
         state.token = data.token;
         state.expiresAt = data.expiresAt;
-        state.user = data.user || 'admin';
+        state.user = userInput || 'admin'; // 登录响应不含用户名，用表单输入值，别再显示 admin
         localStorage.setItem('cms-token', data.token);
         localStorage.setItem('cms-expires', String(data.expiresAt));
         localStorage.setItem('cms-user', state.user);
@@ -369,7 +374,7 @@ function renderPosts() {
       var html =
         '<div class="page-head"><h1>文章</h1><span style="color:var(--text-muted);font-size:14px">共 ' +
         posts.length + ' 篇</span><span class="spacer"></span>' +
-        '<input class="search-input" id="post-search" placeholder="搜标题或标签…">' +
+        '<input class="search-input" id="post-search" placeholder="搜标题、标签或正文…">' +
         '<select id="post-tag" style="width:130px"><option value="">全部标签</option>' +
         allTags.map(function (t) { return '<option>' + esc(t) + '</option>'; }).join('') +
         '</select>' +
@@ -384,6 +389,7 @@ function renderPosts() {
           var hitKw =
             !kw ||
             p.title.toLowerCase().includes(kw) ||
+            String(p.body || '').toLowerCase().includes(kw) ||
             (p.tags || []).some(function (t) {
               return t.toLowerCase().includes(kw);
             });
@@ -464,7 +470,8 @@ function renderMarkdown(src) {
     if (h) {
       flushPara();
       flushList();
-      var lv = Math.min(h[1].length + 1, 4);
+      // 标题级别与线上 Astro 渲染一致：## 就是 h2（文章大标题在 frontmatter，由模板渲染）
+      var lv = Math.min(h[1].length, 4);
       out.push('<h' + lv + '>' + inline(h[2]) + '</h' + lv + '>');
       continue;
     }
@@ -910,20 +917,62 @@ function bindMediaDelegates() {
     }
     var delBtn = e.target.closest('button[data-del]');
     if (delBtn) {
-      var name = delBtn.dataset.del;
-      confirmModal('删除图片', '确定删除 ' + name + ' 吗？正在使用它的文章会显示裂图。', '删除').then(function (yes) {
-        if (!yes) return;
-        api('DELETE', 'media', { query: { name: name } })
-          .then(function () {
-            toast('已删除');
-            renderMedia();
-          })
-          .catch(function (err) {
-            toast(err.message, true);
-          });
-      });
+      deleteImageFlow(delBtn.dataset.del);
     }
   });
+}
+
+/**
+ * 删图流程：先尽力扫描文章正文里的引用（列表数据带 body，含草稿），
+ * 被引用时把确认弹窗升级为红色警告并列出引用文章；列表拿不到就退回普通确认。
+ */
+function deleteImageFlow(name) {
+  function doDelete() {
+    api('DELETE', 'media', { query: { name: name } })
+      .then(function () {
+        toast('已删除');
+        renderMedia();
+      })
+      .catch(function (err) {
+        toast(err.message, true);
+      });
+  }
+  function ask() {
+    return confirmModal('删除图片', '确定删除 ' + name + ' 吗？正在使用它的文章会显示裂图。', '删除');
+  }
+  var cached = state.postsCache;
+  var prep =
+    cached && cached.map
+      ? Promise.resolve(cached)
+      : api('GET', 'posts')
+          .then(function (data) {
+            state.postsCache = data.posts || [];
+            return state.postsCache;
+          })
+          .catch(function () {
+            return null; // 引用检查是尽力而为，不挡删除
+          });
+  prep
+    .then(function (list) {
+      if (!list) return ask();
+      var used = list.filter(function (p) {
+        return String(p.body || '').indexOf('/assets/uploads/' + name) !== -1;
+      });
+      if (!used.length) return ask();
+      var titles = used
+        .map(function (p) {
+          return '《' + (p.title || p.slug) + '》' + (p.draft ? '（草稿）' : '');
+        })
+        .join('、');
+      return confirmModal(
+        '图片正在使用',
+        name + ' 正被这些文章引用：' + titles + '。删除后它们会显示裂图。',
+        '仍然删除'
+      );
+    })
+    .then(function (yes) {
+      if (yes) doDelete();
+    });
 }
 
 /** 浏览器端压缩：长边 ≤1600px；透明图输出 webp，其余 jpeg（控制在 900KB 内适配边缘函数 1MB 限制） */
@@ -992,6 +1041,14 @@ function uploadFiles(files) {
 app = $('#app');
 bindMediaDelegates();
 if (loggedIn()) {
-  api('GET', 'session').catch(function () {});
+  // 校验 token 的同时刷新用户名（token 里才有真实身份，localStorage 可能是旧值）
+  api('GET', 'session')
+    .then(function (data) {
+      if (data.user && data.user !== state.user) {
+        state.user = data.user;
+        localStorage.setItem('cms-user', state.user);
+      }
+    })
+    .catch(function () {});
 }
 nav();
