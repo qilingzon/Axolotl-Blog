@@ -425,7 +425,7 @@ function renderMarkdown(src) {
   var lines = String(src || '').split('\n');
   var out = [];
   var i = 0;
-  var listType = null; // 'ul' | 'ol'
+  var listStack = []; // 嵌套列表栈，每项 {type: 'ul'|'ol'}
   var inCode = false;
   var codeBuf = [];
   var paraBuf = [];
@@ -438,10 +438,7 @@ function renderMarkdown(src) {
   }
 
   function flushList() {
-    if (listType) {
-      out.push('</' + listType + '>');
-      listType = null;
-    }
+    while (listStack.length) out.push('</' + listStack.pop().type + '>');
   }
 
   function inline(s) {
@@ -451,6 +448,7 @@ function renderMarkdown(src) {
     s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
     s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    s = s.replace(/~~([^~]+)~~/g, '<del>$1</del>');
     return s;
   }
 
@@ -503,12 +501,22 @@ function renderMarkdown(src) {
     if (ul || ol) {
       flushPara();
       var type = ul ? 'ul' : 'ol';
-      if (listType !== type) {
-        flushList();
-        out.push('<' + type + '>');
-        listType = type;
+      var item = (ul || ol)[1];
+      var task = item.match(/^\[( |x|X)\]\s+(.*)$/);
+      var li = task
+        ? '<li class="task"><input type="checkbox" disabled' + (task[1].toLowerCase() === 'x' ? ' checked' : '') + '>' + inline(task[2]) + '</li>'
+        : '<li>' + inline(item) + '</li>';
+      // 行首两个空格 = 子项（最多两层，与序列化口径一致）
+      var depth = /^\s{2,}\S/.test(line) ? 2 : 1;
+      while (listStack.length > depth) out.push('</' + listStack.pop().type + '>');
+      if (listStack.length === depth && listStack[listStack.length - 1].type !== type) {
+        out.push('</' + listStack.pop().type + '>');
       }
-      out.push('<li>' + inline((ul || ol)[1]) + '</li>');
+      while (listStack.length < depth) {
+        out.push('<' + type + '>');
+        listStack.push({ type: type });
+      }
+      out.push(li);
       continue;
     }
     if (line.includes('|') && lines[i + 1] && /^[\s|:-]+$/.test(lines[i + 1])) {
@@ -548,6 +556,169 @@ function renderMarkdown(src) {
   return out.join('\n');
 }
 
+// ---------- 小白模式：块解析与序列化（纯函数，块 ↔ 标准 Markdown 无损往返） ----------
+
+var BLOCK_TYPE_LABELS = {
+  p: '段落', h2: '大标题', h3: '小标题', h4: '小小标题',
+  list: '列表', tasks: '任务清单', quote: '引用', img: '图片',
+  code: '代码', table: '表格', hr: '分隔线', raw: '原始 Markdown',
+};
+
+function parseBlocks(md) {
+  var lines = String(md || '').split('\n');
+  var blocks = [];
+  var para = [];
+  var i = 0;
+
+  function flushPara() {
+    if (para.length) {
+      blocks.push({ type: 'p', text: para.join('\n') });
+      para = [];
+    }
+  }
+
+  for (; i < lines.length; i++) {
+    var line = lines[i];
+    if (line.startsWith('```')) {
+      flushPara();
+      var codeBuf = [];
+      i++;
+      while (i < lines.length && !lines[i].startsWith('```')) {
+        codeBuf.push(lines[i]);
+        i++;
+      }
+      blocks.push({ type: 'code', text: codeBuf.join('\n') });
+      continue;
+    }
+    if (/^\s*$/.test(line)) {
+      flushPara();
+      continue;
+    }
+    var h = line.match(/^(#{1,4})\s+(.*)$/);
+    if (h) {
+      flushPara();
+      if (h[1].length === 1) {
+        // 一级标题留给 frontmatter 的大标题，正文里出现按原样保留
+        blocks.push({ type: 'raw', text: line });
+      } else {
+        blocks.push({ type: 'h' + h[1].length, text: h[2] });
+      }
+      continue;
+    }
+    if (/^(-{3,}|\*{3,})\s*$/.test(line)) {
+      flushPara();
+      blocks.push({ type: 'hr' });
+      continue;
+    }
+    if (/^>\s?/.test(line)) {
+      flushPara();
+      var quote = [];
+      while (i < lines.length && /^>\s?/.test(lines[i])) {
+        quote.push(lines[i].replace(/^>\s?/, ''));
+        i++;
+      }
+      i--;
+      blocks.push({ type: 'quote', text: quote.join('\n') });
+      continue;
+    }
+    // 表格：本行含 | 且下一行是 GFM 分隔行
+    if (line.includes('|') && lines[i + 1] && /^\s*:?[\s|:-]*-[\s|:-]*$/.test(lines[i + 1])) {
+      flushPara();
+      var trows = [];
+      while (i < lines.length && lines[i].includes('|') && !/^\s*$/.test(lines[i])) {
+        trows.push(lines[i]);
+        i++;
+      }
+      i--;
+      var parseRow = function (r) {
+        var cells = r.split('|');
+        cells.shift();
+        cells.pop();
+        return cells.map(function (c) { return c.trim(); });
+      };
+      blocks.push({
+        type: 'table',
+        rows: trows.filter(function (r, idx) { return idx !== 1; }).map(parseRow),
+      });
+      continue;
+    }
+    var ul = line.match(/^(\s*)[-*]\s+(.*)$/);
+    var ol = line.match(/^(\s*)\d+\.\s+(.*)$/);
+    if (ul || ol) {
+      flushPara();
+      var mark = (ul || ol)[2];
+      var isTask = /^\[( |x|X)\]\s+/.test(mark);
+      var ordered = !!ol;
+      var item = {
+        text: mark.replace(/^\[( |x|X)\]\s+/, ''),
+        level: (ul || ol)[1].length >= 2 ? 1 : 0,
+        done: /^\[(x|X)\]/.test(mark),
+      };
+      var last = blocks[blocks.length - 1];
+      if (last && last.type === (isTask ? 'tasks' : 'list') && (isTask || last.ordered === ordered)) {
+        last.items.push(item);
+      } else if (isTask) {
+        blocks.push({ type: 'tasks', items: [item] });
+      } else {
+        blocks.push({ type: 'list', ordered: ordered, items: [item] });
+      }
+      continue;
+    }
+    var im = line.match(/^\s*!\[([^\]]*)\]\(([^)\s]+)\)\s*$/);
+    if (im) {
+      flushPara();
+      blocks.push({ type: 'img', alt: im[1], url: im[2] });
+      continue;
+    }
+    para.push(line);
+  }
+  flushPara();
+  return blocks.length ? blocks : [{ type: 'p', text: '' }];
+}
+
+function blocksToMarkdown(blocks) {
+  var parts = (blocks || []).map(function (b) {
+    if (b.type === 'p') return b.text;
+    if (b.type === 'h2') return '## ' + b.text;
+    if (b.type === 'h3') return '### ' + b.text;
+    if (b.type === 'h4') return '#### ' + b.text;
+    if (b.type === 'hr') return '---';
+    if (b.type === 'quote') {
+      return String(b.text || '').split('\n').map(function (l) { return '> ' + l; }).join('\n');
+    }
+    if (b.type === 'img') return '![' + (b.alt || '') + '](' + (b.url || '') + ')';
+    if (b.type === 'code') return '```\n' + b.text + '\n```';
+    if (b.type === 'raw') return b.text;
+    if (b.type === 'list') {
+      var counters = [0, 0];
+      return b.items.map(function (it) {
+        var lv = it.level ? 1 : 0;
+        counters[lv]++;
+        if (lv === 0) counters[1] = 0;
+        var mark = b.ordered ? counters[lv] + '. ' : '- ';
+        return (it.level ? '  ' : '') + mark + it.text;
+      }).join('\n');
+    }
+    if (b.type === 'tasks') {
+      return b.items.map(function (it) {
+        return (it.level ? '  ' : '') + '- [' + (it.done ? 'x' : ' ') + '] ' + it.text;
+      }).join('\n');
+    }
+    if (b.type === 'table') {
+      var rows = (b.rows && b.rows.length) ? b.rows : [['', '']];
+      var cell = function (c) { return String(c == null ? '' : c).replace(/\|/g, '｜'); };
+      var md = '| ' + rows[0].map(cell).join(' | ') + ' |';
+      md += '\n| ' + rows[0].map(function () { return '---'; }).join(' | ') + ' |';
+      rows.slice(1).forEach(function (r) {
+        md += '\n| ' + r.map(cell).join(' | ') + ' |';
+      });
+      return md;
+    }
+    return '';
+  }).filter(function (s) { return s !== ''; });
+  return parts.join('\n\n');
+}
+
 // ---------- 编辑器 ----------
 
 function defaultSlug() {
@@ -571,6 +742,544 @@ function toLocalInput(iso) {
     d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' +
     p(d.getHours()) + ':' + p(d.getMinutes())
   );
+}
+
+// ---------- 小白模式：块编辑器 ----------
+
+function createBlockEditor(deps) {
+  var root = deps.root;
+  var blocks = [];
+  var dragIdx = -1;
+
+  function md() {
+    return blocksToMarkdown(blocks);
+  }
+
+  // ---------- 单块 HTML ----------
+
+  function blkBar(idx, b) {
+    return (
+      '<div class="blk__bar">' +
+      '<span class="blk__drag" draggable="true" title="拖动可调整顺序">⠿</span>' +
+      '<span class="blk__type">' + BLOCK_TYPE_LABELS[b.type] + '</span>' +
+      (b.type === 'p'
+        ? '<span class="blk__inline">' +
+          '<button type="button" data-wrap="**" title="把选中的文字加粗">加粗</button>' +
+          '<button type="button" data-wrap="*" title="把选中的文字变斜体">斜体</button>' +
+          '<button type="button" data-wrap="`" title="变成行内代码">行内代码</button>' +
+          '<button type="button" data-wrap="~~" title="给选中文字加删除线">删除线</button>' +
+          '<button type="button" data-wrap="link" title="给选中文字加个网址">链接</button>' +
+          '</span>'
+        : '') +
+      '<span class="spacer"></span>' +
+      '<button type="button" class="blk__op" data-op="up" title="上移">↑</button>' +
+      '<button type="button" class="blk__op" data-op="down" title="下移">↓</button>' +
+      '<button type="button" class="blk__op" data-op="copy" title="复制这个块">复制</button>' +
+      '<button type="button" class="blk__op blk__op--del" data-op="del" title="删除这个块">✕</button>' +
+      '</div>'
+    );
+  }
+
+  function blkBody(idx, b) {
+    if (b.type === 'p' || b.type === 'quote' || b.type === 'raw') {
+      var hint = b.type === 'raw' ? '<div class="blk__hint">进阶内容：这块会原样保留，不做加工</div>' : '';
+      return hint + '<textarea data-f="text" rows="' + Math.max(3, String(b.text || '').split('\n').length) + '" placeholder="' +
+        (b.type === 'p' ? '这里写这一段的话……' : b.type === 'quote' ? '引用的原文……' : '原样保留的 Markdown……') +
+        '">' + esc(b.text || '') + '</textarea>';
+    }
+    if (b.type === 'h2' || b.type === 'h3' || b.type === 'h4') {
+      return '<input type="text" data-f="text" value="' + esc(b.text || '') + '" placeholder="标题文字">';
+    }
+    if (b.type === 'list') {
+      var lines = b.items.map(function (it) { return (it.level ? '  ' : '') + it.text; });
+      return '<textarea data-f="items-text" rows="' + Math.max(2, lines.length) + '" placeholder="一行一条。行首敲两个空格，这条就变成子项">' + esc(lines.join('\n')) + '</textarea>';
+    }
+    if (b.type === 'tasks') {
+      var rows = b.items.map(function (it, i2) {
+        return (
+          '<div class="blk__taskrow">' +
+          '<input type="checkbox" data-f="taskdone" data-i="' + i2 + '"' + (it.done ? ' checked' : '') + ' title="打勾=已完成">' +
+          '<input type="text" data-f="tasktext" data-i="' + i2 + '" value="' + esc(it.text) + '" placeholder="要做的事……">' +
+          '<button type="button" class="blk__op" data-op="deltask" data-i="' + i2 + '" title="删掉这一项">✕</button>' +
+          '</div>'
+        );
+      }).join('');
+      return rows + '<button type="button" class="blk__op blk__more" data-op="addtask">＋ 一项</button>';
+    }
+    if (b.type === 'img') {
+      return (
+        '<div class="blk__imgrow">' +
+        '<input type="text" data-f="alt" value="' + esc(b.alt || '') + '" placeholder="图片说明（可不填）">' +
+        '<input type="text" data-f="url" value="' + esc(b.url || '') + '" placeholder="图片地址">' +
+        '<button type="button" class="btn btn--sm" data-op="pick">选图片</button>' +
+        '</div>' +
+        '<div class="blk__thumbwrap' + (b.url ? '' : ' hidden') + '"><img class="blk__thumb" data-role="thumb" src="' + esc(b.url || '') + '" alt=""></div>' +
+        '<div class="blk__hint">也可以把图片文件直接粘贴或拖到这块上，会自动压缩上传</div>'
+      );
+    }
+    if (b.type === 'code') {
+      return '<textarea data-f="text" class="blk__code" rows="' + Math.max(4, String(b.text || '').split('\n').length) + '" placeholder="代码原样贴进来">' + esc(b.text || '') + '</textarea>';
+    }
+    if (b.type === 'table') {
+      var tools =
+        '<div class="tbl-tools">' +
+        '<button type="button" data-tbl="addrow">＋一行</button>' +
+        '<button type="button" data-tbl="addcol">＋一列</button>' +
+        '<button type="button" data-tbl="delrow">删末行</button>' +
+        '<button type="button" data-tbl="delcol">删末列</button>' +
+        '<span class="blk__hint">第一行是表头</span>' +
+        '</div>';
+      var g = '<table class="tbl-edit"><tbody>';
+      b.rows.forEach(function (row, r) {
+        g += '<tr>';
+        row.forEach(function (c, c2) {
+          g += '<td><input type="text" data-f="cell" data-r="' + r + '" data-c="' + c2 + '" value="' + esc(c) + '"></td>';
+        });
+        g += '<td class="tbl-edit__del"><button type="button" class="blk__op" data-tbl="delrow-at" data-r="' + r + '" title="删除这一行">✕</button></td>';
+        g += '</tr>';
+      });
+      g += '</tbody></table><div class="tbl-cols">';
+      b.rows[0].forEach(function (c, c2) {
+        g += '<button type="button" class="blk__op" data-tbl="delcol-at" data-c="' + c2 + '" title="删除这一列">列' + (c2 + 1) + ' ✕</button>';
+      });
+      return tools + g + '</div>';
+    }
+    if (b.type === 'hr') {
+      return '<div class="blk__hrdemo">———— 分隔线 ————</div>';
+    }
+    return '';
+  }
+
+  function renderAll(focusIdx) {
+    var html = blocks.map(function (b, idx) {
+      return (
+        '<div class="blk blk--' + b.type + '" data-idx="' + idx + '">' +
+        blkBar(idx, b) +
+        '<div class="blk__body">' + blkBody(idx, b) + '</div>' +
+        '</div>'
+      );
+    }).join('');
+    if (!blocks.length) html = '<div class="empty-tip">下面点「＋ 添加」开始写</div>';
+    root.querySelector('#blk-list').innerHTML = html;
+    if (focusIdx != null && blocks[focusIdx]) {
+      var el = root.querySelector('.blk[data-idx="' + focusIdx + '"] textarea, .blk[data-idx="' + focusIdx + '"] input[type="text"]');
+      if (el) {
+        el.focus();
+        if (el.setSelectionRange && el.value) el.setSelectionRange(el.value.length, el.value.length);
+      }
+    }
+  }
+
+  // ---------- 事件：输入与操作 ----------
+
+  root.addEventListener('input', function (e) {
+    var t = e.target;
+    var card = t.closest('.blk');
+    if (!card) return;
+    var b = blocks[Number(card.dataset.idx)];
+    if (!b) return;
+    var f = t.dataset.f;
+    if (!f) return;
+    if (f === 'text') b.text = t.value;
+    else if (f === 'alt') b.alt = t.value;
+    else if (f === 'url') {
+      b.url = t.value.trim();
+      var tw = card.querySelector('.blk__thumbwrap');
+      var thumb = card.querySelector('[data-role=thumb]');
+      if (thumb && b.url) {
+        thumb.src = b.url;
+        tw.classList.remove('hidden');
+      } else if (tw) {
+        tw.classList.add('hidden');
+      }
+    } else if (f === 'items-text') {
+      b.items = t.value.split('\n').map(function (l) {
+        return { text: l.replace(/^\s+/, ''), level: /^\s{2,}/.test(l) ? 1 : 0 };
+      }).filter(function (it) { return it.text !== ''; });
+    } else if (f === 'tasktext') b.items[Number(t.dataset.i)].text = t.value;
+    else if (f === 'taskdone') b.items[Number(t.dataset.i)].done = t.checked;
+    else if (f === 'cell') b.rows[Number(t.dataset.r)][Number(t.dataset.c)] = t.value;
+    changed('input');
+  });
+  root.addEventListener('change', function (e) {
+    if (e.target.dataset && e.target.dataset.f === 'taskdone') {
+      var card2 = e.target.closest('.blk');
+      var b2 = blocks[Number(card2.dataset.idx)];
+      if (b2) b2.items[Number(e.target.dataset.i)].done = e.target.checked;
+      changed('input');
+    }
+  });
+
+  root.addEventListener('click', function (e) {
+    var wrapBtn = e.target.closest('[data-wrap]');
+    if (wrapBtn) {
+      doWrap(wrapBtn.dataset.wrap);
+      return;
+    }
+    var tblBtn = e.target.closest('[data-tbl]');
+    if (tblBtn) {
+      doTableOp(tblBtn);
+      return;
+    }
+    var opBtn = e.target.closest('[data-op]');
+    if (!opBtn) return;
+    var card = opBtn.closest('.blk');
+    var idx = Number(card.dataset.idx);
+    var op = opBtn.dataset.op;
+    if (op === 'up' && idx > 0) {
+      var tmp = blocks[idx - 1];
+      blocks[idx - 1] = blocks[idx];
+      blocks[idx] = tmp;
+      renderAll(idx - 1);
+      changed('structure');
+    } else if (op === 'down' && idx < blocks.length - 1) {
+      var tmp2 = blocks[idx + 1];
+      blocks[idx + 1] = blocks[idx];
+      blocks[idx] = tmp2;
+      renderAll(idx + 1);
+      changed('structure');
+    } else if (op === 'copy') {
+      blocks.splice(idx + 1, 0, JSON.parse(JSON.stringify(blocks[idx])));
+      renderAll(idx + 1);
+      changed('structure');
+    } else if (op === 'del') {
+      delBlock(idx);
+    } else if (op === 'pick') {
+      pickImage(function (url) {
+        blocks[idx].url = url;
+        renderAll(idx);
+        changed('structure');
+      });
+    } else if (op === 'addtask') {
+      blocks[idx].items.push({ text: '', done: false, level: 0 });
+      renderAll();
+      changed('structure');
+    } else if (op === 'deltask') {
+      blocks[idx].items.splice(Number(opBtn.dataset.i), 1);
+      if (!blocks[idx].items.length) blocks[idx].items.push({ text: '', done: false, level: 0 });
+      renderAll(idx);
+      changed('structure');
+    }
+  });
+
+  function changed(kind) {
+    deps.onChange(kind || 'input');
+  }
+
+  function ensureNonEmpty() {
+    if (!blocks.length) blocks.push({ type: 'p', text: '' });
+  }
+
+  function isBlockEmpty(b) {
+    if (b.type === 'list' || b.type === 'tasks') {
+      return !b.items.some(function (it) { return String(it.text || '').trim(); });
+    }
+    if (b.type === 'img') return !(b.url || '').trim();
+    if (b.type === 'table') {
+      return !b.rows.some(function (r) { return r.some(function (c) { return String(c).trim(); }); });
+    }
+    if (b.type === 'hr') return true;
+    return !String(b.text || '').trim();
+  }
+
+  function blockSnippet(b) {
+    var s = '';
+    if (b.text != null) s = b.text;
+    else if (b.items) s = b.items.map(function (it) { return it.text; }).join('；');
+    else if (b.rows) s = b.rows.map(function (r) { return r.join(' | '); }).join(' / ');
+    else if (b.url) s = b.url;
+    return String(s || '（空）').trim().slice(0, 60);
+  }
+
+  function delBlock(idx) {
+    var b = blocks[idx];
+    var label = BLOCK_TYPE_LABELS[b.type] || '块';
+    if (isBlockEmpty(b)) {
+      blocks.splice(idx, 1);
+      ensureNonEmpty();
+      renderAll();
+      changed('structure');
+      return;
+    }
+    confirmModal('删除这个' + label + '？', '内容：' + blockSnippet(b), '删除').then(function (yes) {
+      if (!yes) return;
+      blocks.splice(idx, 1);
+      ensureNonEmpty();
+      // 不回焦输入框：让 Ctrl+Z 落在容器上走块级撤销
+      renderAll();
+      changed('structure');
+    });
+  }
+
+  function doWrap(kind) {
+    var card = document.activeElement && document.activeElement.closest ? document.activeElement.closest('.blk') : null;
+    if (!card) {
+      card = root.querySelector('.blk--p');
+    }
+    var ta2 = card ? card.querySelector('textarea[data-f=text]') : null;
+    if (!ta2) {
+      toast('先在段落里选中文字，再点按钮', true);
+      return;
+    }
+    var s = ta2.selectionStart;
+    var e2 = ta2.selectionEnd;
+    var sel = ta2.value.slice(s, e2);
+    if (kind === 'link') {
+      ta2.setRangeText('[' + sel + '](https://)', s, e2, 'end');
+      var urlStart = s + sel.length + 3;
+      ta2.setSelectionRange(urlStart, urlStart + 8);
+    } else {
+      ta2.setRangeText(kind + sel + kind, s, e2, 'end');
+      ta2.setSelectionRange(s + kind.length, s + kind.length + sel.length);
+    }
+    blocks[Number(card.dataset.idx)].text = ta2.value;
+    ta2.focus();
+    changed('input');
+  }
+
+  function doTableOp(btn) {
+    var card = btn.closest('.blk');
+    var idx = Number(card.dataset.idx);
+    var b = blocks[idx];
+    var op = btn.dataset.tbl;
+    var nr = b.rows.length;
+    var nc = b.rows[0].length;
+    if (op === 'addrow') b.rows.push(new Array(nc).join('.').split('.').map(function () { return ''; }));
+    else if (op === 'addcol') b.rows.forEach(function (r) { r.push(''); });
+    else if (op === 'delrow' && nr > 1) b.rows.pop();
+    else if (op === 'delcol' && nc > 1) b.rows.forEach(function (r) { r.pop(); });
+    else if (op === 'delrow-at' && nr > 1) b.rows.splice(Number(btn.dataset.r), 1);
+    else if (op === 'delcol-at' && nc > 1) b.rows.forEach(function (r) { r.splice(Number(btn.dataset.c), 1); });
+    else return;
+    renderAll(idx);
+    changed('structure');
+  }
+
+  // ---------- 拖拽排序 / 文件拖入 / 粘贴上传 ----------
+
+  root.addEventListener('dragstart', function (e) {
+    var handle = e.target.closest('.blk__drag');
+    if (!handle) return;
+    var card = handle.closest('.blk');
+    dragIdx = Number(card.dataset.idx);
+    card.classList.add('blk--dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', String(dragIdx)); } catch (err) { /* IE 兼容 */ }
+  });
+  root.addEventListener('dragover', function (e) {
+    var card = e.target.closest('.blk');
+    if (!card || dragIdx < 0) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    root.querySelectorAll('.blk--drop').forEach(function (el) { el.classList.remove('blk--drop'); });
+    card.classList.add('blk--drop');
+  });
+  root.addEventListener('drop', function (e) {
+    var files = e.dataTransfer && e.dataTransfer.files;
+    var card = e.target.closest ? e.target.closest('.blk') : null;
+    if (files && files.length && card && blocks[Number(card.dataset.idx)] && blocks[Number(card.dataset.idx)].type === 'img') {
+      e.preventDefault();
+      uploadIntoBlock(Number(card.dataset.idx), files);
+      cleanupDrag();
+      return;
+    }
+    if (!card || dragIdx < 0) return;
+    e.preventDefault();
+    var to = Number(card.dataset.idx);
+    if (to !== dragIdx) {
+      var moved = blocks.splice(dragIdx, 1)[0];
+      blocks.splice(to, 0, moved);
+      renderAll(to);
+      changed('structure');
+    }
+    cleanupDrag();
+  });
+  root.addEventListener('dragend', cleanupDrag);
+
+  function cleanupDrag() {
+    dragIdx = -1;
+    root.querySelectorAll('.blk--dragging, .blk--drop').forEach(function (el) {
+      el.classList.remove('blk--dragging', 'blk--drop');
+    });
+  }
+
+  root.addEventListener('paste', function (e) {
+    var files = e.clipboardData && e.clipboardData.files;
+    if (!files || !files.length) return;
+    var card = e.target.closest ? e.target.closest('.blk') : null;
+    if (!card) return;
+    if (blocks[Number(card.dataset.idx)].type !== 'img') return;
+    e.preventDefault();
+    uploadIntoBlock(Number(card.dataset.idx), files);
+  });
+
+  function uploadIntoBlock(idx, files) {
+    var b = blocks[idx];
+    toast('正在压缩并上传图片……');
+    var chain = Promise.resolve();
+    Array.prototype.forEach.call(files, function (f) {
+      chain = chain
+        .then(function () {
+          return uploadImageFile(f);
+        })
+        .then(function (r) {
+          b.url = r.url;
+          if (!b.alt) b.alt = f.name.replace(/\.[^.]+$/, '');
+          renderAll(idx);
+          changed('structure');
+          toast('图片已上传');
+        })
+        .catch(function (err) {
+          toast(err.message, true);
+        });
+    });
+  }
+
+  // 结构性撤销：Ctrl+Z / Ctrl+Y（焦点在输入框内时交给浏览器原生撤销）
+  // 绑在 document 上：块操作后焦点可能落在 body，容器级监听会收不到
+  document.addEventListener('keydown', function (e) {
+    if (!root.offsetParent) return; // 小白面板未显示时不拦
+    var mod = e.ctrlKey || e.metaKey;
+    if (!mod) return;
+    var k = e.key.toLowerCase();
+    if (k !== 'z' && k !== 'y') return;
+    var t = e.target;
+    if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT')) return;
+    if (k === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      deps.step(-1);
+    } else if (k === 'y' || (k === 'z' && e.shiftKey)) {
+      e.preventDefault();
+      deps.step(1);
+    }
+  });
+
+  // ---------- 添加块 ----------
+
+  root.querySelector('#blk-add').addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-add]');
+    if (!btn) return;
+    blocks.push(newBlock(btn.dataset.add));
+    renderAll(blocks.length - 1);
+    changed('structure');
+  });
+
+  function newBlock(type) {
+    if (type === 'h2' || type === 'h3' || type === 'h4') return { type: type, text: '' };
+    if (type === 'list') return { type: 'list', ordered: false, items: [{ text: '', level: 0 }] };
+    if (type === 'tasks') return { type: 'tasks', items: [{ text: '', done: false, level: 0 }] };
+    if (type === 'img') return { type: 'img', alt: '', url: '' };
+    if (type === 'table') return { type: 'table', rows: [['列1', '列2'], ['', '']] };
+    if (type === 'hr') return { type: 'hr' };
+    if (type === 'raw') return { type: 'raw', text: '' };
+    if (type === 'quote') return { type: 'quote', text: '' };
+    if (type === 'code') return { type: 'code', text: '' };
+    return { type: 'p', text: '' };
+  }
+
+  // ---------- 图片选择器 ----------
+
+  function pickImage(cb) {
+    api('GET', 'media')
+      .then(function (data) {
+        var images = data.images || [];
+        var mask = document.createElement('div');
+        mask.className = 'modal-mask';
+        mask.innerHTML =
+          '<div class="modal picker">' +
+          '<h3>选一张图片</h3>' +
+          '<div class="picker__grid">' +
+          (images.length
+            ? images.map(function (im) {
+                return (
+                  '<button type="button" class="picker__item" data-url="' + esc(im.url) + '" title="' + esc(im.name) + '">' +
+                  '<img src="' + esc(im.url) + '" alt=""><span>' + esc(im.name) + '</span></button>'
+                );
+              }).join('')
+            : '<div class="empty-tip">媒体库还是空的，先上传一张吧</div>') +
+          '</div>' +
+          '<div class="modal__actions">' +
+          '<button type="button" class="btn btn--ghost btn--sm" data-pick="upload">上传新图片</button>' +
+          '<span class="spacer"></span>' +
+          '<button type="button" class="btn btn--ghost btn--sm" data-pick="close">取消</button>' +
+          '</div>' +
+          '<input type="file" accept="image/*" multiple hidden data-role="picker-file">' +
+          '</div>';
+        document.body.appendChild(mask);
+        var fileInput = mask.querySelector('[data-role=picker-file]');
+        function close() {
+          document.removeEventListener('keydown', onKey);
+          mask.remove();
+        }
+        function onKey(e) {
+          if (e.key === 'Escape') close();
+        }
+        document.addEventListener('keydown', onKey);
+        mask.addEventListener('click', function (e) {
+          if (e.target === mask) {
+            close();
+            return;
+          }
+          var item = e.target.closest('[data-url]');
+          if (item) {
+            close();
+            cb(item.dataset.url);
+            return;
+          }
+          var act = e.target.closest('[data-pick]');
+          if (!act) return;
+          if (act.dataset.pick === 'close') close();
+          if (act.dataset.pick === 'upload') fileInput.click();
+        });
+        fileInput.addEventListener('change', function () {
+          var files = this.files;
+          if (!files || !files.length) return;
+          toast('正在压缩并上传……');
+          var chain = Promise.resolve();
+          var last = null;
+          Array.prototype.forEach.call(files, function (f) {
+            chain = chain
+              .then(function () {
+                return uploadImageFile(f);
+              })
+              .then(function (r) {
+                last = r;
+                toast('已上传：' + f.name);
+              });
+          });
+          chain
+            .then(function () {
+              close();
+              if (last) cb(last.url);
+            })
+            .catch(function (err) {
+              toast(err.message, true);
+            });
+        });
+      })
+      .catch(function (err) {
+        toast(err.message, true);
+      });
+  }
+
+  // ---------- 对外接口 ----------
+
+  return {
+    load: function (markdown) {
+      blocks = parseBlocks(markdown);
+      renderAll();
+    },
+    toMarkdown: md,
+    countChars: function () {
+      return md().replace(/\s/g, '').length;
+    },
+    refreshPreview: function () {
+      var wrap = root.querySelector('#blk-preview-wrap');
+      if (wrap.hidden) return;
+      root.querySelector('#blk-preview').innerHTML =
+        renderMarkdown(md()) || '<p style="color:var(--text-muted)">预览会出现在这里……</p>';
+    },
+  };
 }
 
 function renderEditor(slug) {
@@ -605,7 +1314,29 @@ function renderEditor(slug) {
         '<div class="field draft-toggle"><label class="switch"><input type="checkbox" id="f-draft" ' + (post && post.draft ? 'checked' : '') + '><span class="switch__track"></span><span class="switch__thumb"></span></label>' +
         '<span>存为草稿（前台不显示，随时可发布）</span></div>' +
         '</div>' +
-        '<div class="card">' +
+        '<div class="card" id="editor-card">' +
+        '<div class="ed-topbar">' +
+        '<div class="mode-seg" id="mode-seg" role="group" aria-label="写作方式">' +
+        '<button type="button" data-mode="easy" title="像搭积木一样写，不用学任何符号">小白写作</button>' +
+        '<button type="button" data-mode="pro" title="直接写 Markdown，左右分栏实时预览">进阶写作</button>' +
+        '</div>' +
+        '<span class="word-count" id="word-count"></span>' +
+        '<span class="spacer"></span>' +
+        '<button type="button" class="ed-topbar__btn" id="focus-btn" title="收起上面的文章信息，专心写正文">专注</button>' +
+        '<button type="button" class="ed-topbar__btn" id="pv-toggle-btn" title="展开/收起正文预览">预览</button>' +
+        '</div>' +
+        '<div id="easy-pane">' +
+        '<div id="blk-list"></div>' +
+        '<div class="blk-add" id="blk-add"><span class="blk-add__label">＋ 添加：</span>' +
+        blkAddBtn('p', '段落') + blkAddBtn('h2', '大标题') + blkAddBtn('h3', '小标题') +
+        blkAddBtn('list', '列表') + blkAddBtn('tasks', '任务清单') + blkAddBtn('quote', '引用') +
+        blkAddBtn('img', '图片') + blkAddBtn('code', '代码') + blkAddBtn('table', '表格') +
+        blkAddBtn('hr', '分隔线') + blkAddBtn('raw', '原始 Markdown') +
+        '</div>' +
+        '<div class="preview-pane blk-preview" id="blk-preview-wrap" hidden><div class="md-body" id="blk-preview"></div></div>' +
+        '<p class="blk-tip">写好了点下面的「发布」，内容会自动存成标准格式，以后随时能改。</p>' +
+        '</div>' +
+        '<div id="pro-pane">' +
         '<div class="md-toolbar" id="md-tools">' +
         '<button type="button" data-hist="undo" title="回退（Ctrl+Z）" disabled>↩ 回退</button>' +
         '<button type="button" data-hist="redo" title="恢复（Ctrl+Y）" disabled>↪ 恢复</button>' +
@@ -621,6 +1352,7 @@ function renderEditor(slug) {
         '<div class="split">' +
         '<textarea id="f-body" placeholder="在这里写正文……（支持 Markdown）">' + esc(post ? post.body : '') + '</textarea>' +
         '<div class="preview-pane" id="preview-pane"><div class="md-body" id="preview"></div></div>' +
+        '</div>' +
         '</div>' +
         '<div class="editor-actions">' +
         '<button class="btn" id="save-btn">' + (isNew ? '发布' : '保存') + '</button>' +
@@ -642,6 +1374,10 @@ function mdBtn(label, title, before, after) {
   return (
     '<button type="button" data-before="' + esc(before) + '" data-after="' + esc(after) + '" title="' + title + '">' + label + '</button>'
   );
+}
+
+function blkAddBtn(type, label) {
+  return '<button type="button" data-add="' + type + '">＋ ' + label + '</button>';
 }
 
 function bindEditor(origSlug, post) {
@@ -684,15 +1420,16 @@ function bindEditor(origSlug, post) {
     redoBtn.disabled = histIdx >= hist.length - 1;
   }
 
-  function pushHist() {
+  function pushHist(forceValue) {
+    var v = arguments.length ? forceValue : ta.value;
     clearTimeout(histTimer);
     var top = hist[hist.length - 1];
-    if (top && top.v === ta.value) {
+    if (top && top.v === v) {
       syncHistButtons();
       return;
     }
     hist = hist.slice(0, histIdx + 1);
-    hist.push({ v: ta.value, s: ta.selectionStart, e: ta.selectionEnd });
+    hist.push({ v: v, s: ta.selectionStart, e: ta.selectionEnd });
     if (hist.length > 200) hist.shift();
     histIdx = hist.length - 1;
     syncHistButtons();
@@ -705,8 +1442,13 @@ function bindEditor(origSlug, post) {
     var snap = hist[histIdx];
     ta.value = snap.v;
     ta.setSelectionRange(snap.s, snap.e);
-    ta.focus();
-    refreshPreview();
+    if (typeof easyMode !== 'undefined' && easyMode) {
+      blk.load(snap.v);
+      blk.refreshPreview();
+    } else {
+      ta.focus();
+      refreshPreview();
+    }
     syncHistButtons();
   }
 
@@ -769,6 +1511,150 @@ function bindEditor(origSlug, post) {
     $('#preview-pane').dataset.pvTheme = pvThemes[pvIdx];
   });
 
+  // ---------- 小白模式（块编辑） ----------
+  var easyMode = (localStorage.getItem('cms-editor-mode') || 'easy') !== 'pro';
+  var AUTODRAFT_KEY = 'cms-autodraft';
+
+  function currentBody() {
+    return easyMode ? blk.toMarkdown() : ta.value;
+  }
+
+  var blk = createBlockEditor({
+    root: $('#easy-pane'),
+    onChange: function (kind) {
+      dirty = true;
+      updateWordCount();
+      if (kind === 'structure') {
+        pushHist(blk.toMarkdown());
+      } else {
+        clearTimeout(histTimer);
+        histTimer = setTimeout(function () {
+          pushHist(blk.toMarkdown());
+        }, 350);
+      }
+      blk.refreshPreview();
+    },
+    step: function (d) {
+      stepHist(d);
+    },
+  });
+  blk.load(ta.value);
+
+  function updateWordCount() {
+    var n = easyMode ? blk.countChars() : ta.value.replace(/\s/g, '').length;
+    $('#word-count').textContent = n ? '约 ' + n + ' 字' : '';
+  }
+
+  function applyMode() {
+    $('#easy-pane').hidden = !easyMode;
+    $('#pro-pane').hidden = easyMode;
+    $('#pv-toggle-btn').hidden = !easyMode;
+    $('#mode-seg').querySelectorAll('button').forEach(function (b) {
+      b.classList.toggle('active', (b.dataset.mode === 'easy') === easyMode);
+    });
+    if (easyMode) blk.refreshPreview();
+    updateWordCount();
+  }
+  applyMode();
+
+  $('#mode-seg').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-mode]');
+    if (!btn) return;
+    var wantEasy = btn.dataset.mode === 'easy';
+    if (wantEasy === easyMode) return;
+    if (wantEasy) {
+      blk.load(ta.value);
+    } else {
+      ta.value = blk.toMarkdown();
+      refreshPreview();
+    }
+    easyMode = wantEasy;
+    localStorage.setItem('cms-editor-mode', easyMode ? 'easy' : 'pro');
+    dirty = true;
+    applyMode();
+    pushHist();
+  });
+
+  $('#focus-btn').addEventListener('click', function () {
+    var grid = document.querySelector('.editor-grid');
+    var on = grid.classList.toggle('focus-mode');
+    this.textContent = on ? '退出专注' : '专注';
+  });
+
+  $('#pv-toggle-btn').addEventListener('click', function () {
+    var wrap = $('#blk-preview-wrap');
+    wrap.hidden = !wrap.hidden;
+    this.textContent = wrap.hidden ? '预览' : '收起预览';
+    blk.refreshPreview();
+  });
+
+  // ---------- 自动暂存：防断电/误关丢稿 ----------
+  function collectMeta() {
+    return {
+      title: $('#f-title').value,
+      description: $('#f-desc').value,
+      pubDate: $('#f-date').value,
+      slug: $('#f-slug').value,
+      tags: $('#f-tags').value,
+      accent: pickedAccent,
+      draft: $('#f-draft').checked,
+    };
+  }
+  function restoreMeta(m) {
+    $('#f-title').value = m.title || '';
+    $('#f-desc').value = m.description || '';
+    $('#f-date').value = m.pubDate || '';
+    $('#f-slug').value = m.slug || '';
+    $('#f-tags').value = m.tags || '';
+    $('#f-draft').checked = !!m.draft;
+    pickedAccent = m.accent || 'pink';
+    $('#f-accent').querySelectorAll('button').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.id === pickedAccent);
+    });
+  }
+  setInterval(function () {
+    if (!dirty) return;
+    try {
+      localStorage.setItem(AUTODRAFT_KEY, JSON.stringify({
+        slug: isNew ? 'new' : origSlug,
+        at: Date.now(),
+        mode: easyMode ? 'easy' : 'pro',
+        meta: collectMeta(),
+        body: currentBody(),
+      }));
+    } catch (e) { /* 存储异常忽略 */ }
+  }, 30000);
+
+  try {
+    var ad = JSON.parse(localStorage.getItem(AUTODRAFT_KEY) || 'null');
+    if (ad && ad.body != null && ad.slug === (isNew ? 'new' : origSlug)) {
+      confirmModal(
+        '发现自动暂存的草稿',
+        '上次编辑到 ' + new Date(ad.at).toLocaleString() + ' 的内容已自动暂存。要恢复吗？（选取消就丢弃暂存）',
+        '恢复'
+      ).then(function (yes) {
+        if (!yes) {
+          localStorage.removeItem(AUTODRAFT_KEY);
+          return;
+        }
+        restoreMeta(ad.meta || {});
+        if (ad.mode === 'pro') {
+          easyMode = false;
+          ta.value = ad.body;
+        } else {
+          easyMode = true;
+          blk.load(ad.body);
+        }
+        localStorage.setItem('cms-editor-mode', easyMode ? 'easy' : 'pro');
+        applyMode();
+        dirty = true;
+        pushHist();
+        toast('已恢复上次暂存的内容');
+      });
+    }
+  } catch (e) { /* 暂存内容损坏则忽略 */ }
+
+
   $('#save-btn').addEventListener('click', function () {
     var slug = $('#f-slug').value.trim();
     if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,80}$/.test(slug)) {
@@ -794,11 +1680,12 @@ function bindEditor(origSlug, post) {
           accent: pickedAccent,
           draft: $('#f-draft').checked,
         },
-        body: $('#f-body').value,
+        body: currentBody(),
       },
     })
       .then(function () {
         editorGuard = null; // 保存成功后的跳转不拦截
+        localStorage.removeItem('cms-autodraft');
         toast('已保存，站点构建约需一分钟');
         location.hash = '#/posts';
       })
@@ -1024,17 +1911,24 @@ function compressImage(file) {
   });
 }
 
+/** 压缩并上传一张图片，返回 Promise<{name, url}>；媒体库、块编辑器、图片选择器共用 */
+function uploadImageFile(file) {
+  return compressImage(file)
+    .then(function (img) {
+      return api('POST', 'media', { body: img }).then(function () {
+        return { name: img.name, url: '/assets/uploads/' + img.name };
+      });
+    });
+}
+
 function uploadFiles(files) {
   if (!files.length) return;
   toast('正在压缩并上传 ' + files.length + ' 张图片……');
   var chain = Promise.resolve();
-  files.forEach(function (f) {
+  Array.prototype.forEach.call(files, function (f) {
     chain = chain
       .then(function () {
-        return compressImage(f);
-      })
-      .then(function (img) {
-        return api('POST', 'media', { body: img });
+        return uploadImageFile(f);
       })
       .then(function () {
         toast('已上传：' + f.name);

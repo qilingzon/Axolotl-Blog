@@ -884,6 +884,378 @@ a.stat:hover {
   padding: 60px 0;
 }
 
+/* ---------- 编辑器顶栏（模式切换 / 字数 / 专注 / 预览） ---------- */
+
+.hidden {
+  display: none !important;
+}
+
+.ed-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.mode-seg {
+  display: inline-flex;
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.mode-seg button {
+  padding: 6px 14px;
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 0;
+  cursor: pointer;
+}
+
+.mode-seg button + button {
+  border-left: var(--border-w) solid var(--border);
+}
+
+.mode-seg button.active {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.word-count {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.ed-topbar__btn {
+  padding: 5px 10px;
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.ed-topbar__btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* 专注模式：隐藏元信息卡，正文满宽 */
+.editor-grid.focus-mode > .card:first-child {
+  display: none;
+}
+
+/* ---------- 小白模式：块 ---------- */
+
+#blk-list {
+  display: grid;
+  gap: 12px;
+}
+
+.blk {
+  background: var(--surface);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+}
+
+.blk--dragging {
+  opacity: 0.45;
+}
+
+.blk--drop {
+  outline: 2px dashed var(--accent);
+  outline-offset: 2px;
+}
+
+.blk__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  min-width: 0;
+}
+
+.blk__drag {
+  cursor: grab;
+  color: var(--text-muted);
+  font-size: 15px;
+  user-select: none;
+  padding: 0 2px;
+}
+
+.blk__type {
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.blk__inline {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.blk__inline button,
+.blk__op,
+.tbl-tools button {
+  padding: 3px 8px;
+  font-size: 12px;
+  font-family: var(--font-display);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.blk__inline button:hover,
+.blk__op:hover,
+.tbl-tools button:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.blk__op--del:hover {
+  color: var(--danger, #d64550);
+  border-color: var(--danger, #d64550);
+}
+
+.blk__op[disabled] {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.blk__body {
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.blk__body textarea,
+.blk__body input[type='text'] {
+  width: 100%;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  line-height: 1.7;
+  resize: vertical;
+}
+
+.blk__body textarea.blk__code {
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 13.5px;
+}
+
+.blk__body textarea:focus,
+.blk__body input[type='text']:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.blk__hint {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.blk__taskrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.blk__taskrow input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  flex: none;
+}
+
+.blk__taskrow input[type='text'] {
+  flex: 1;
+}
+
+.blk__more {
+  justify-self: start;
+}
+
+.blk__imgrow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.blk__imgrow input[type='text'] {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.blk__thumbwrap img {
+  max-width: 280px;
+  max-height: 180px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.blk__hrdemo {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  letter-spacing: 4px;
+}
+
+.blk-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.blk-add__label {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.blk-add button {
+  padding: 5px 11px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.blk-add button:hover {
+  color: var(--accent-text);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.blk-tip {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ---------- 可视化表格 ---------- */
+
+.tbl-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tbl-edit {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.tbl-edit td {
+  border: 1px solid var(--border);
+  padding: 0;
+}
+
+.tbl-edit input[type='text'] {
+  border: 0 !important;
+  background: transparent;
+  padding: 6px 8px !important;
+}
+
+.tbl-edit td:first-child input {
+  font-weight: bold;
+}
+
+.tbl-edit__del {
+  border: 0 !important;
+  padding: 0 4px !important;
+}
+
+.tbl-cols {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ---------- 图片选择器 ---------- */
+
+.picker {
+  width: min(640px, 92vw);
+}
+
+.picker__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+  max-height: 52vh;
+  overflow: auto;
+  padding: 4px 2px;
+}
+
+.picker__item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  padding: 6px;
+  cursor: pointer;
+  display: grid;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.picker__item:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.picker__item img {
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--bg-soft);
+}
+
+.picker__item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 预览里的任务清单勾选框 */
+.md-body li.task {
+  list-style: none;
+  margin-left: -18px;
+}
+
+.md-body li.task input[type='checkbox'] {
+  accent-color: var(--accent);
+  margin-right: 4px;
+}
+
 /* ---------- 响应式 ---------- */
 
 @media (max-width: 860px) {
@@ -904,5 +1276,22 @@ a.stat:hover {
     order: 3;
     width: 100%;
     justify-content: center;
+  }
+
+  .blk__bar {
+    flex-wrap: wrap;
+  }
+
+  .blk__inline {
+    order: 5;
+    width: 100%;
+  }
+
+  .blk__imgrow input[type='text'] {
+    flex-basis: 100%;
+  }
+
+  .tbl-cols button {
+    padding: 3px 8px;
   }
 }
