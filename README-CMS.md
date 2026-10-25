@@ -105,7 +105,7 @@ node scripts/cms-setup.mjs
 
 ## 技术参考（一般不用看）
 
-- **组成部分**：`public/admin/` 全中文三主题单页应用（含 `setup.html` 部署助手）+ `edge-functions/api/[[default]].js` 边缘函数（登录鉴权 + GitHub 读写代理）+ `scripts/cms-dev.mjs` 本地环境（8090 端口）。
+- **组成部分**：`public/admin/` 全中文三主题单页应用（含 `setup.html` 部署助手）+ `edge-functions/api/[[default]].js` 边缘函数（登录鉴权 + GitHub 读写代理）+ `scripts/cms-dev.mjs` 本地环境（默认 8792 端口，避开常被本机工具占用的 8090）。
 - **本地配置**：`.env.local`（已被 gitignore）存放 6 个变量：4 个核心变量 + 可选覆盖 `CMS_REPO` / `CMS_BRANCH`。
 - **登录机制**：账号密码（环境变量校验，常数时间比较），令牌 HMAC 签名、12 小时有效；连续错 5 次锁 15 分钟（滑动窗口，重新部署即清零，无解锁后门）。
 - **安全底线**：GitHub 令牌只存在服务端环境变量里，浏览器接触不到；所有出站请求走白名单，仅放行 `api.github.com`（含 GraphQL 端点）；`/admin/` 带 `noindex`。

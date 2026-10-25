@@ -8,7 +8,8 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const DIST = join(ROOT, 'dist');
-const PORT = Number(process.env.PORT || 8090);
+// 默认 8792：8090 常被本机反代等工具占用（127.0.0.1:8090 抢答导致请求时通时不通），换冷门端口
+const PORT = Number(process.env.PORT || 8792);
 
 // 读取 .env.local（KEY=VALUE 每行一条）
 const env = { ...process.env };

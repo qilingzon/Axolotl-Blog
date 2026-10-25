@@ -183,7 +183,7 @@ async function main() {
   console.log('\n⚠ 里面有密码和令牌：别发别人、别截图外传。');
   if (!wrote) console.log('（提示：本地 .env.local 是旧配置，想更新可重跑本脚本）');
   console.log('\n接下来：打开 README-CMS.md 跟着「第 1 步」继续，共 3 步，约 10 分钟。');
-  console.log('想在本地先试试？npm run build && node scripts/cms-dev.mjs → http://localhost:8090/admin/');
+  console.log('想在本地先试试？npm run build && node scripts/cms-dev.mjs → http://localhost:8792/admin/');
   finished = true;
   rl.close();
 }

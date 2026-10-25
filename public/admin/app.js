@@ -226,7 +226,7 @@ function renderShell(active, contentHtml) {
     '<a href="#/posts" class="' + (active === 'posts' ? 'active' : '') + '">文章</a>' +
     '<a href="#/media" class="' + (active === 'media' ? 'active' : '') + '">媒体库</a>' +
     '</nav>' +
-    '<button class="icon-btn" id="theme-btn" title="切换主题">' + esc(THEMES.find(function (t) { return t.id === themeNow; }).label) + '</button>' +
+    '<button class="icon-btn" id="theme-btn" title="切换主题">' + esc((THEMES.find(function (t) { return t.id === themeNow; }) || THEMES[0]).label) + '</button>' +
     '<a class="icon-btn" href="/" target="_blank" rel="noopener">看博客</a>' +
     '<button class="icon-btn" id="logout-btn">退出</button>' +
     '</div></header>' +
@@ -1671,7 +1671,7 @@ function bindEditor(origSlug, post) {
     api('PUT', 'posts', {
       slug: slug,
       body: {
-        oldSlug: isNew || slug === origSlug ? '' : origSlug,
+        oldSlug: isNew ? '' : origSlug, // 恒传原 slug：服务端靠 oldSlug===slug 区分「改自己」与「撞别人」
         post: {
           title: $('#f-title').value.trim(),
           description: $('#f-desc').value.trim(),
@@ -1732,7 +1732,7 @@ function renderMedia() {
             images
               .map(function (im) {
                 return (
-                  '<div class="media-item"><img src="' + im.url + '" alt="" loading="lazy">' +
+                  '<div class="media-item"><img src="' + esc(im.url) + '" alt="" loading="lazy">' +
                   '<div class="media-item__bar"><span class="media-item__name" title="' + esc(im.name) + '">' +
                   esc(im.name) + '（' + fmtSize(im.size) + '）</span>' +
                   '<button class="btn btn--ghost btn--sm" data-copy="' + esc(im.url) + '">复制</button>' +
@@ -1874,7 +1874,7 @@ function deleteImageFlow(name) {
     });
 }
 
-/** 浏览器端压缩：长边 ≤1600px；透明图输出 webp，其余 jpeg（控制在 900KB 内适配边缘函数 1MB 限制） */
+/** 浏览器端压缩：长边 ≤1600px；透明图输出 webp，其余 jpeg。目标 base64 ≤980KB 字符——base64 有 4/3 膨胀，加 JSON 外壳后必须落在边缘函数 1MB 请求体限制内（旧口径 900KB 二进制 ≈1.2MB base64，线上会 413） */
 function compressImage(file) {
   return new Promise(function (resolve, reject) {
     var url = URL.createObjectURL(file);
@@ -1892,14 +1892,30 @@ function compressImage(file) {
       URL.revokeObjectURL(url);
       var hasAlpha = file.type === 'image/png' || file.type === 'image/webp' || file.type === 'image/gif';
       var type = hasAlpha ? 'image/webp' : 'image/jpeg';
+      var MAX_B64 = 980 * 1024;
       var quality = 0.85;
       var dataUrl = canvas.toDataURL(type, quality);
-      while (dataUrl.length > 900 * 1024 * 1.37 && quality > 0.5) {
-        quality -= 0.1;
+      while (dataUrl.length > MAX_B64) {
+        if (quality > 0.5) {
+          quality -= 0.1;
+        } else {
+          // 质量压到底仍超标：降一档分辨率重画（极端大图兜底，循环必收敛）
+          w = Math.max(1, Math.round(w * 0.8));
+          h = Math.max(1, Math.round(h * 0.8));
+          canvas.width = w;
+          canvas.height = h;
+          ctx.drawImage(img, 0, 0, w, h);
+          quality = 0.8;
+        }
         dataUrl = canvas.toDataURL(type, quality);
       }
       var ext = hasAlpha ? 'webp' : 'jpg';
-      var base = file.name.replace(/\.[^.]+$/, '').replace(/[^\w\u4e00-\u9fa5-]+/g, '-') || 'image';
+      var base =
+        file.name
+          .replace(/\.[^.]+$/, '')
+          .replace(/[^0-9A-Za-z_-]+/g, '-') // 后端文件名白名单仅 ASCII，含中文会被整名拒收
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 60) || 'image';
       var stamp = Date.now().toString(36);
       resolve({ name: base + '-' + stamp + '.' + ext, data: dataUrl.split(',')[1] });
     };

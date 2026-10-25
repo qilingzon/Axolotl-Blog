@@ -259,8 +259,11 @@ export async function onRequest(context) {
     if (path === '/api/media' && method === 'DELETE') return await handleDeleteMedia(url);
     return fail('接口不存在', 404);
   } catch (err) {
-    const status = err && err.status ? (err.status === 404 ? 500 : 502) : 500;
-    return fail('服务器开小差了：' + (err && err.message ? err.message : String(err)), status);
+    // 上游 404 原样透传（各 handler 已改写为中文文案）；其余上游错误按网关错误处理。
+    // 401/403 特意不透传——那是 GitHub 令牌问题，不是访客登录态问题，透传会误触发前端登出
+    const status = !err || !err.status ? 500 : err.status === 404 ? 404 : 502;
+    const msg = (err && err.message) || String(err);
+    return fail(status === 404 ? msg : '服务器开小差了：' + msg, status);
   }
 }
 
@@ -441,6 +444,11 @@ async function handlePostItem(method, slug, request) {
       throw e;
     });
     const isNew = !existing;
+    // 撞名保护：目标已存在且不是同一篇（改名撞别人 / 新建撞旧文）→ 拒绝，绝不静默覆盖
+    const oldSlug = String(input.oldSlug || '');
+    if (existing && oldSlug !== slug) {
+      return fail('该文件名已被占用，请换一个再保存', 409);
+    }
     await ghFetch(repoSegments('contents', filePath), {
       method: 'PUT',
       body: {
@@ -452,7 +460,6 @@ async function handlePostItem(method, slug, request) {
     });
 
     // slug 变更时删除旧文件
-    const oldSlug = String(input.oldSlug || '');
     if (oldSlug && oldSlug !== slug && SLUG_RE.test(oldSlug)) {
       const oldPath = `${POSTS_DIR}/${oldSlug}.md`;
       const old = await ghFetch(repoSegments('contents', oldPath)).catch(() => null);

@@ -24,7 +24,7 @@ node scripts/cms-setup.mjs
 npm install
 npm run dev        # 本地预览站点
 npm run build      # 构建到 dist/
-node scripts/cms-dev.mjs   # 本地 CMS 环境（http://localhost:8090/admin/）
+node scripts/cms-dev.mjs   # 本地 CMS 环境（http://localhost:8792/admin/）
 ```
 
 ## 目录速览
