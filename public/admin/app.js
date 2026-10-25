@@ -99,6 +99,127 @@ function confirmModal(title, text, okLabel) {
   });
 }
 
+/** 版本历史弹窗：列表 → 预览某版 → 确认回滚。onRolledBack 在回滚成功后回调（用于刷新编辑器）。
+ *  单个弹窗内部切换内容（列表/预览），Esc / 点遮罩 / 关闭按钮均可退出。 */
+function openHistoryModal(slug, onRolledBack) {
+  var mask = document.createElement('div');
+  mask.className = 'modal-mask';
+  mask.innerHTML =
+    '<div class="modal modal--wide"><h3>版本历史</h3>' +
+    '<div class="hist-body"><p class="modal__tip">正在取历史记录……</p></div>' +
+    '<div class="modal__actions"><button class="btn btn--ghost" data-act="close">关闭</button></div></div>';
+  var body = mask.querySelector('.hist-body');
+  var actions = mask.querySelector('.modal__actions');
+  function close() {
+    document.removeEventListener('keydown', onKey);
+    mask.remove();
+  }
+  function onKey(e) {
+    if (e.key === 'Escape') close();
+  }
+  function fmtDate(iso) {
+    var d = new Date(iso);
+    return isNaN(d)
+      ? String(iso || '')
+      : d.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function showList() {
+    body.innerHTML = '<p class="modal__tip">正在取历史记录……</p>';
+    actions.innerHTML = '<button class="btn btn--ghost" data-act="close">关闭</button>';
+    api('GET', 'history', { slug: slug })
+      .then(function (data) {
+        var versions = data.versions || [];
+        if (!versions.length) {
+          body.innerHTML = '<p class="modal__tip">这篇文章还没有历史记录。</p>';
+          return;
+        }
+        body.innerHTML =
+          '<p class="modal__tip">最近 ' + versions.length + ' 次修改，点任意一条看看当时的样子：</p>' +
+          '<div class="hist-list">' +
+          versions
+            .map(function (v, i) {
+              return (
+                '<button type="button" class="hist-item" data-ref="' + esc(v.sha) + '"' +
+                ' data-date="' + esc(v.date) + '" data-msg="' + esc(v.message) + '">' +
+                '<span class="hist-item__date">' + esc(fmtDate(v.date)) + '</span>' +
+                '<span class="hist-item__msg">' + esc(v.message || '（无提交说明）') + '</span>' +
+                '<span class="hist-item__meta">' + esc(v.author || '') + ' · ' + esc(v.short) + (i === 0 ? ' · 当前版' : '') + '</span>' +
+                '</button>'
+              );
+            })
+            .join('') +
+          '</div>';
+      })
+      .catch(function (err) {
+        body.innerHTML = '<p class="modal__tip">' + esc(err.message) + '</p>';
+      });
+  }
+
+  function showVersion(v) {
+    body.innerHTML = '<p class="modal__tip">正在取这一版的内容……</p>';
+    api('GET', 'version', { slug: slug, query: { ref: v.sha } })
+      .then(function (p) {
+        body.innerHTML =
+          '<p class="modal__tip">' + esc(fmtDate(v.date)) + ' · ' + esc(v.message || '') +
+          '（标题：' + esc(p.title || '未命名') + '）</p>' +
+          '<div class="hist-preview md-body">' +
+          (renderMarkdown(p.body || '') || '<p>（这一版正文是空的）</p>') +
+          '</div>';
+        actions.innerHTML =
+          '<button class="btn btn--ghost" data-act="back">← 返回列表</button>' +
+          '<button class="btn btn--ghost" data-act="close">关闭</button>' +
+          '<button class="btn btn--danger" data-act="rollback">回到这一版</button>';
+        actions.querySelector('[data-act="back"]').addEventListener('click', showList);
+        actions.querySelector('[data-act="rollback"]').addEventListener('click', function () {
+          confirmModal(
+            '回到这一版',
+            '整篇文章（正文、标题、标签等）都会恢复到 ' + fmtDate(v.date) + ' 的样子，现在没保存的修改会被它替换。确定吗？',
+            '回滚'
+          ).then(function (yes) {
+            if (!yes) return;
+            var btn = actions.querySelector('[data-act="rollback"]');
+            btn.disabled = true;
+            btn.textContent = '正在回滚……';
+            api('PUT', 'version', { slug: slug, body: { ref: v.sha } })
+              .then(function () {
+                close();
+                toast('已回滚，站点构建约需一分钟');
+                if (onRolledBack) onRolledBack();
+              })
+              .catch(function (err) {
+                btn.disabled = false;
+                btn.textContent = '回到这一版';
+                toast(err.message, true);
+              });
+          });
+        });
+      })
+      .catch(function (err) {
+        body.innerHTML = '<p class="modal__tip">' + esc(err.message) + '</p>';
+      });
+  }
+
+  mask.addEventListener('click', function (e) {
+    var act = e.target.getAttribute && e.target.getAttribute('data-act');
+    if (act === 'close' || e.target === mask) {
+      close();
+      return;
+    }
+    var item = e.target.closest && e.target.closest('.hist-item');
+    if (item) {
+      showVersion({
+        sha: item.getAttribute('data-ref'),
+        date: item.getAttribute('data-date'),
+        message: item.getAttribute('data-msg'),
+      });
+    }
+  });
+  document.body.appendChild(mask);
+  document.addEventListener('keydown', onKey);
+  showList();
+}
+
 // ---------- API 封装 ----------
 
 /** 端点固定表：url 只能由常量表 + 严格消毒的片段构成，杜绝任意地址请求 */
@@ -106,6 +227,8 @@ var ENDPOINTS = {
   login: '/api/login',
   session: '/api/session',
   posts: '/api/posts',
+  history: '/api/history',
+  version: '/api/version',
   media: '/api/media',
 };
 
@@ -1321,6 +1444,7 @@ function renderEditor(slug) {
         '<button type="button" data-mode="pro" title="直接写 Markdown，左右分栏实时预览">进阶写作</button>' +
         '</div>' +
         '<span class="word-count" id="word-count"></span>' +
+        (isNew ? '' : '<button type="button" class="ed-topbar__btn" id="hist-btn" title="这篇文章的修改历史，可以回到任意一版">历史</button>') +
         '<span class="spacer"></span>' +
         '<button type="button" class="ed-topbar__btn" id="focus-btn" title="收起上面的文章信息，专心写正文">专注</button>' +
         '<button type="button" class="ed-topbar__btn" id="pv-toggle-btn" title="展开/收起正文预览">预览</button>' +
@@ -1654,6 +1778,16 @@ function bindEditor(origSlug, post) {
     }
   } catch (e) { /* 暂存内容损坏则忽略 */ }
 
+
+  // ---------- 版本历史：打开历史弹窗；回滚成功后重载编辑器 ----------
+  if (!isNew) {
+    $('#hist-btn').addEventListener('click', function () {
+      openHistoryModal(origSlug, function () {
+        editorGuard = null; // 回滚是主动丢弃当前修改，重载不拦截
+        renderEditor(origSlug);
+      });
+    });
+  }
 
   $('#save-btn').addEventListener('click', function () {
     var slug = $('#f-slug').value.trim();

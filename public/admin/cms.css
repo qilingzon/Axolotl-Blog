@@ -878,6 +878,76 @@ a.stat:hover {
   margin-top: 18px;
 }
 
+/* ---------- 版本历史弹窗 ---------- */
+
+.modal--wide {
+  width: min(720px, 94vw);
+  text-align: left;
+}
+
+.modal__tip {
+  color: var(--text-muted);
+  font-size: 13.5px;
+  margin: 2px 0 12px;
+}
+
+.hist-list {
+  max-height: 46vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hist-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: baseline;
+  text-align: left;
+  padding: 10px 12px;
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.hist-item:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.hist-item__date {
+  font-family: var(--font-display);
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+
+.hist-item__msg {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.hist-item__meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.hist-preview {
+  max-height: 46vh;
+  overflow: auto;
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  background: var(--surface-2);
+  text-align: left;
+}
+
 .loading {
   text-align: center;
   color: var(--text-muted);
