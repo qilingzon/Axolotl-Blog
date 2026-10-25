@@ -5,7 +5,7 @@
 ## 当前状态
 
 - 工程：D:\zcodework\blog / Astro 5.18.2 纯静态博客 / 主题：Minecraft 紫粉美西螈
-- 后台易用性（2026-10-24，bab32a9）：针对小白反馈——仪表盘三张统计卡改可点击（文章→全部 / 标签→按标签筛选 / 草稿→只看草稿，a.stat 悬停浮起）；文章页新增「只看草稿」勾选（renderPosts(mode)，#/posts/draft 直达并勾选）；编辑器工具栏 H2/H3/B/I 改全中文（标题/小标题/加粗/斜体…）+ 右侧「小白须知：先选中文字再点按钮 · 写错了点 ↩ 回退」。真实点击走查 + 三主题（pink-soft/purple-pixel/lumen-cave）×（仪表盘/编辑器）截图验收通过；线上 bab32a9 已部署复验。白屏修复 1900b10：/admin 无尾斜杠时 ./app.js 相对路径 404 → 全部改 /admin/ 绝对路径
+- 后台易用性（2026-10-24，bab32a9）：针对小白反馈——仪表盘三张统计卡改可点击（文章→全部 / 标签→按标签筛选 / 草稿→只看草稿，a.stat 悬停浮起）；文章页新增「只看草稿」勾选（renderPosts(mode)，#/posts/draft 直达并勾选）；编辑器工具栏 H2/H3/B/I 改全中文（标题/小标题/加粗/斜体…）+ 右侧「小白须知：先选中文字再点按钮 · 写错了点 ↩ 回退」。真实点击走查 + 三主题（pink-soft/purple-pixel/lumen-cave）×（仪表盘/编辑器）截图验收通过；线上 bab32a9 已部署复验。白屏修复 1900b10：/admin 无尾斜杠时 ./app.js 相对路径 404 → 全部改 /admin/ 绝对路径。线上单篇编辑器报 InvalidCharacterError 修复 419bdb3：GitHub contents API 的 base64 内嵌换行、部分边缘运行时 atob 不容忍 → b64ToBytes 解码前 strip 空白（本地 Node Buffer 解码容忍换行所以测试没暴露；列表走 GraphQL 拿纯文本也不受影响，仅单篇 GET/保存前的 GET 中招）
 - 进度：**阶段 1-5 ✅ + 吉祥物家族/加载动画/搜索/移动端 ✅ + 美西螈 CMS（EdgeOne Pages 版）✅**
   - **美西螈 CMS**：`public/admin/`（全中文三主题 SPA）+ `edge-functions/api/[[default]].js`（登录鉴权 + GitHub 代理；出站白名单仅 api.github.com；HMAC 签名 token 12h；连续错 5 次锁 15 分钟）+ `scripts/cms-dev.mjs`（本地环境 8090，`.env.local` 供凭据已 gitignore）。Sveltia 已移除，部署指南见 README-CMS.md（EdgeOne 控制台接仓库 + CMS_USERNAME/PASSWORD/SESSION_SECRET/GITHUB_TOKEN 四个环境变量）
   - CMS 走查与修复（2026-10-25）：全功能 UI 走查后修掉两个 🔴——媒体库全局委托改为启动时绑一次（原每次渲染叠加导致重复上传/弹窗叠层，`bindMediaDelegates`）；编辑器未保存保护（脏状态跟踪 + nav 路由拦截 `editorGuard`/`restoringHash` + beforeunload，保存/删除成功后放行）。已验：留下内容不丢、确认走放行、干净态不拦、保存删除不拦、粘贴只传一张、弹窗单层。遗留 🟡：预览标题层级比线上深一级、后台搜索不搜正文、列表 N+1 API、防爆破无备用路径、欢迎语固定 admin、图片按钮占位符整体替换、标题/摘要不在撤销栈、删除无回收站
