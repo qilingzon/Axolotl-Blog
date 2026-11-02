@@ -796,6 +796,19 @@ a.stat:hover {
   text-overflow: ellipsis;
 }
 
+.media-item__dims {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.media-item__ops {
+  display: flex;
+  gap: 6px;
+  padding: 0 8px 8px;
+}
+
 .dropzone {
   border: 2px dashed var(--border);
   border-radius: var(--radius);

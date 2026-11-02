@@ -1497,7 +1497,11 @@ function renderEditor(slug) {
       var accent = post ? post.accent : 'pink';
       var html =
         '<div class="page-head"><h1>' + (isNew ? '写新文章' : '编辑文章') + '</h1><span class="spacer"></span>' +
-        (isNew ? '' : '<a class="btn btn--ghost" id="view-live-btn" href="/blog/' + encodeURIComponent(slug) + '/" target="_blank" rel="noopener">看线上页面</a>') +
+        (isNew
+          ? ''
+          : post && post.draft
+            ? '<a class="btn btn--ghost" id="view-live-btn" href="/preview/' + encodeURIComponent(slug) + '/" target="_blank" rel="noopener" title="草稿不进前台，这是只有你知道链接的预览页">预览草稿页</a>'
+            : '<a class="btn btn--ghost" id="view-live-btn" href="/blog/' + encodeURIComponent(slug) + '/" target="_blank" rel="noopener">看线上页面</a>') +
         '</div>' +
         '<div class="editor-grid">' +
         '<div class="card">' +
@@ -1962,28 +1966,67 @@ function renderMedia() {
   api('GET', 'media')
     .then(function (data) {
       var images = data.images || [];
+
+      function gridHtml(list) {
+        return list.length
+          ? '<div class="media-grid">' +
+              list
+                .map(function (im) {
+                  return (
+                    '<div class="media-item"><img src="' + esc(im.url) + '" alt="" loading="lazy">' +
+                    '<div class="media-item__bar"><span class="media-item__name" title="' + esc(im.name) + '">' +
+                    esc(im.name) + '（' + fmtSize(im.size) + '）</span>' +
+                    '<span class="media-item__dims"></span></div>' +
+                    '<div class="media-item__ops">' +
+                    '<button class="btn btn--ghost btn--sm" data-copy="' + esc(im.url) + '" title="复制 Markdown 引用">MD</button>' +
+                    '<button class="btn btn--ghost btn--sm" data-copyurl="' + esc(im.url) + '" title="复制原始链接">链接</button>' +
+                    '<button class="btn btn--danger btn--sm" data-del="' + esc(im.name) + '">删</button>' +
+                    '</div></div>'
+                  );
+                })
+                .join('') +
+              '</div>'
+          : '<div class="empty-tip"><img src="/assets/axolotl-cyan.png" alt=""><br>' +
+            (images.length ? '没有匹配的图片' : '还没有图片，拖一张上来试试') + '</div>';
+      }
+
+      // 图片加载完成后显示原始尺寸（缓存图 load 事件可能已错过，complete 的直接量）
+      function attachDims(root) {
+        root.querySelectorAll('.media-item img').forEach(function (img) {
+          var dims = img.parentElement.querySelector('.media-item__dims');
+          function show() {
+            if (img.naturalWidth) dims.textContent = img.naturalWidth + '×' + img.naturalHeight;
+          }
+          img.addEventListener('load', show);
+          if (img.complete) show();
+        });
+      }
+
       var html =
         '<div class="page-head"><h1>媒体库</h1><span style="color:var(--text-muted);font-size:14px">' +
-        images.length + ' 张图片 · 上传自动压缩</span></div>' +
+        images.length + ' 张图片 · 上传自动压缩</span>' +
+        (images.length > 3
+          ? '<span class="spacer"></span><input class="search-input" id="media-search" placeholder="搜文件名…">'
+          : '') +
+        '</div>' +
         '<div class="dropzone" id="dropzone">把图片拖到这里，或 <button class="btn btn--sm" id="pick-btn" type="button">选择文件</button>（也可以直接 Ctrl+V 粘贴截图）</div>' +
         '<input type="file" id="file-input" accept="image/*" multiple hidden>' +
-        (images.length
-          ? '<div class="media-grid">' +
-            images
-              .map(function (im) {
-                return (
-                  '<div class="media-item"><img src="' + esc(im.url) + '" alt="" loading="lazy">' +
-                  '<div class="media-item__bar"><span class="media-item__name" title="' + esc(im.name) + '">' +
-                  esc(im.name) + '（' + fmtSize(im.size) + '）</span>' +
-                  '<button class="btn btn--ghost btn--sm" data-copy="' + esc(im.url) + '">复制</button>' +
-                  '<button class="btn btn--danger btn--sm" data-del="' + esc(im.name) + '">删</button>' +
-                  '</div></div>'
-                );
-              })
-              .join('') +
-            '</div>'
-          : '<div class="empty-tip"><img src="/assets/axolotl-cyan.png" alt=""><br>还没有图片，拖一张上来试试</div>');
+        '<div id="media-list">' + gridHtml(images) + '</div>';
       renderShell('media', html);
+      attachDims($('#media-list'));
+      var searchEl = $('#media-search');
+      if (searchEl) {
+        searchEl.addEventListener('input', function () {
+          var kw = this.value.trim().toLowerCase();
+          var hit = !kw
+            ? images
+            : images.filter(function (im) {
+                return im.name.toLowerCase().indexOf(kw) !== -1;
+              });
+          $('#media-list').innerHTML = gridHtml(hit);
+          attachDims($('#media-list'));
+        });
+      }
       bindMedia();
     })
     .catch(function (err) {
@@ -2051,6 +2094,18 @@ function bindMediaDelegates() {
         })
         .catch(function () {
           toast('复制失败，请手动复制：' + md, true);
+        });
+      return;
+    }
+    var urlBtn = e.target.closest('button[data-copyurl]');
+    if (urlBtn) {
+      navigator.clipboard
+        .writeText(urlBtn.dataset.copyurl)
+        .then(function () {
+          toast('已复制图片链接');
+        })
+        .catch(function () {
+          toast('复制失败，请手动复制：' + urlBtn.dataset.copyurl, true);
         });
       return;
     }
@@ -2171,8 +2226,8 @@ function compressImage(file) {
 function uploadImageFile(file) {
   return compressImage(file)
     .then(function (img) {
-      return api('POST', 'media', { body: img }).then(function () {
-        return { name: img.name, url: '/assets/uploads/' + img.name };
+      return api('POST', 'media', { body: img }).then(function (res) {
+        return { name: img.name, url: '/assets/uploads/' + img.name, overwritten: !!(res && res.overwritten) };
       });
     });
 }
@@ -2186,8 +2241,8 @@ function uploadFiles(files) {
       .then(function () {
         return uploadImageFile(f);
       })
-      .then(function () {
-        toast('已上传：' + f.name);
+      .then(function (r) {
+        toast('已上传：' + f.name + (r && r.overwritten ? '（已覆盖同名图片）' : ''));
       })
       .catch(function (err) {
         toast(err.message, true);
