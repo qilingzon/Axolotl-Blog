@@ -306,6 +306,7 @@ var app = null;
 var editorGuard = null;
 var restoringHash = false;
 var lastSavedAt = 0; // 最近一次保存成功的时间（跨编辑器实例；用于「看线上页面」构建空窗期提示）
+var pendingTag = ''; // 从标签总览点进来要预选的标签（renderPosts 消费后清空）
 
 window.addEventListener('beforeunload', function (e) {
   if (editorGuard && editorGuard.isDirty()) {
@@ -343,7 +344,11 @@ function nav() {
   }
   var parts = hash.slice(2).split('/');
   if (parts[0] === 'editor' && parts[1]) renderEditor(decodeURIComponent(parts[1]));
-  else if (parts[0] === 'posts') renderPosts(parts[1]);
+  else if (parts[0] === 'posts') {
+    // #/posts/tag/<名称>：从标签总览点进来，预选筛选（名称经 encodeURIComponent 入哈希）
+    if (parts[1] === 'tag' && parts[2]) pendingTag = decodeURIComponent(parts.slice(2).join('/'));
+    renderPosts(parts[1]);
+  } else if (parts[0] === 'tags') renderTags();
   else if (parts[0] === 'media') renderMedia();
   else if (parts[0] === 'login') renderLogin();
   else renderDashboard();
@@ -485,7 +490,7 @@ function renderDashboard() {
           '<a class="btn" href="#/editor/new">写新文章</a></div>' +
           '<div class="stats">' +
           statCard(posts.length, '篇文章', '/assets/axolotl-cyan.png', '#/posts', '看全部文章') +
-          statCard(Object.keys(tags).length, '个标签', '/assets/axolotl-gold.png', '#/posts/tags', '按标签筛选') +
+          statCard(Object.keys(tags).length, '个标签', '/assets/axolotl-gold.png', '#/tags', '看标签总览') +
           statCard(drafts, '篇草稿', '/assets/axolotl-wild.png', '#/posts/draft', '只看草稿') +
           '</div>' +
           '<div class="card"><h3 style="margin-top:0">最近文章</h3>' +
@@ -620,10 +625,62 @@ function renderPosts(mode) {
         goPage(Number(btn.dataset.page));
       });
       refresh(false);
-      if (mode === 'tags') {
+      if (pendingTag) {
+        // 标签总览带进来的预选：下拉赋值并触发一次筛选（标签可能已不存在于下拉则忽略）
         var sel = $('#post-tag');
-        if (sel) sel.focus();
+        if (sel) {
+          sel.value = pendingTag;
+          if (sel.value === pendingTag) sel.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        pendingTag = '';
+      } else if (mode === 'tags') {
+        var sel2 = $('#post-tag');
+        if (sel2) sel2.focus();
       }
+    })
+    .catch(function (err) {
+      renderShell('posts', '<div class="empty-tip">' + esc(err.message) + '</div>');
+    });
+}
+
+// ---------- 标签总览 ----------
+
+function renderTags() {
+  renderShell('posts', loadingTip('标签整理中……'));
+  api('GET', 'posts')
+    .then(function (data) {
+      var posts = data.posts || [];
+      state.postsCache = posts;
+      var counts = {};
+      posts.forEach(function (p) {
+        (p.tags || []).forEach(function (t) {
+          counts[t] = (counts[t] || 0) + 1;
+        });
+      });
+      var names = Object.keys(counts).sort(function (a, b) {
+        return counts[b] - counts[a] || a.localeCompare(b, 'zh-CN');
+      });
+      var html =
+        '<div class="page-head"><h1>标签总览</h1><span style="color:var(--text-muted);font-size:14px">' +
+        names.length + ' 个标签 · 点一个看它的文章</span></div>' +
+        (names.length
+          ? '<div class="tags-view">' +
+            names
+              .map(function (t) {
+                return (
+                  '<button type="button" class="tags-view__chip" data-tag="' + esc(t) + '">' +
+                  esc(t) + '<span class="tags-view__count">' + counts[t] + '</span></button>'
+                );
+              })
+              .join('') +
+            '</div>'
+          : '<div class="empty-tip">还没有标签，写文章时加几个吧</div>');
+      renderShell('posts', html);
+      $('.tags-view').addEventListener('click', function (e) {
+        var chip = e.target.closest('button[data-tag]');
+        if (!chip) return;
+        location.hash = '#/posts/tag/' + encodeURIComponent(chip.dataset.tag);
+      });
     })
     .catch(function (err) {
       renderShell('posts', '<div class="empty-tip">' + esc(err.message) + '</div>');
