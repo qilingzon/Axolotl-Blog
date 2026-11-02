@@ -23,7 +23,11 @@ function envGetter(name) {
 
 const POSTS_DIR = 'src/content/blog';
 const MEDIA_DIR = 'public/assets/uploads';
-const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
+/** 会话时效：默认 12 小时，可用环境变量 CMS_TTL_HOURS 覆盖（>0 才生效） */
+function tokenTtlMs() {
+  const h = Number(envGetter('CMS_TTL_HOURS'));
+  return (h > 0 ? h : 12) * 60 * 60 * 1000;
+}
 /** slug 白名单：ASCII 字母数字开头，仅含字母数字._-，防路径注入 */
 const SLUG_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,80}$/;
 
@@ -113,7 +117,7 @@ function clearFails() {
 // ---------- 会话 token ----------
 
 async function issueToken(user) {
-  const payload = b64uEncode(enc.encode(JSON.stringify({ u: user, e: Date.now() + TOKEN_TTL_MS })));
+  const payload = b64uEncode(enc.encode(JSON.stringify({ u: user, e: Date.now() + tokenTtlMs() })));
   const sig = b64uEncode(await hmacSign(payload));
   return payload + '.' + sig;
 }
@@ -248,6 +252,17 @@ export async function onRequest(context) {
     if (!auth) return fail('未登录或登录已过期，请重新登录', 401);
 
     if (path === '/api/session' && method === 'GET') {
+      // 滑续期：活跃用户的令牌剩不到一半时效时换发新令牌，避免写作到一半被踢下线
+      const ttl = tokenTtlMs();
+      const remaining = auth.e - Date.now();
+      if (remaining < ttl / 2) {
+        return json({
+          user: auth.u,
+          expiresAt: Date.now() + ttl,
+          token: await issueToken(auth.u),
+          renewed: true,
+        });
+      }
       return json({ user: auth.u, expiresAt: auth.e });
     }
     if (path === '/api/posts' && method === 'GET') return await handleListPosts();
@@ -280,8 +295,14 @@ function envConfigured() {
   return CFG.user() && CFG.pass() && CFG.secret() && CFG.token();
 }
 
+/** 锁定提示带剩余分钟数（向上取整），小白不用掐表 */
+function lockedMessage() {
+  const mins = Math.max(1, Math.ceil((loginFails.until - Date.now()) / 60000));
+  return `失败次数太多，请约 ${mins} 分钟后再试`;
+}
+
 async function handleLogin(request) {
-  if (tooManyFails()) return fail('失败次数太多，请 15 分钟后再试', 429);
+  if (tooManyFails()) return fail(lockedMessage(), 429);
   if (!envConfigured()) {
     return fail(
       'CMS 尚未配置：请在 EdgeOne 项目环境变量里设置 CMS_USERNAME / CMS_PASSWORD / CMS_SESSION_SECRET / CMS_GITHUB_TOKEN（打开 /admin/setup.html 部署助手，点几下就能生成这 4 个值）',
@@ -301,11 +322,11 @@ async function handleLogin(request) {
     safeEqual(String(password), String(CFG.pass()))
   ) {
     clearFails();
-    return json({ token: await issueToken(String(username)), expiresAt: Date.now() + TOKEN_TTL_MS });
+    return json({ token: await issueToken(String(username)), expiresAt: Date.now() + tokenTtlMs() });
   }
   recordFail();
   // 第 5 次失败即触发锁定窗口，直接告知锁定；其余次数预告剩余额度
-  if (tooManyFails()) return fail('失败次数太多，请 15 分钟后再试', 429);
+  if (tooManyFails()) return fail(lockedMessage(), 429);
   return fail(`用户名或密码不正确，还可尝试 ${5 - loginFails.count} 次`, 401);
 }
 

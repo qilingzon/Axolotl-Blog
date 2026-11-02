@@ -1378,3 +1378,63 @@ a.stat:hover {
     padding: 3px 8px;
   }
 }
+
+/* ---------- 手机竖屏收紧：每侧 44px 的内边距在 375px 下太奢侈 ---------- */
+@media (max-width: 640px) {
+  .shell {
+    padding: 14px 12px 48px;
+  }
+
+  .card {
+    padding: 14px;
+  }
+
+  .topbar__inner {
+    padding: 8px 12px;
+    gap: 6px;
+  }
+
+  .topbar__nav a {
+    padding: 7px 10px;
+  }
+
+  .icon-btn {
+    padding: 7px 9px;
+  }
+
+  .page-head {
+    gap: 8px;
+  }
+
+  .page-head .btn {
+    flex-basis: 100%;
+    text-align: center;
+  }
+
+  .search-input,
+  #post-tag {
+    flex: 1 1 160px;
+  }
+
+  .field-row {
+    gap: 10px;
+  }
+
+  .login__card {
+    padding: 22px 18px;
+  }
+
+  .blk__op,
+  .ed-topbar__btn {
+    padding: 7px 10px;
+  }
+
+  .modal {
+    width: 100%;
+    margin: 14px;
+  }
+
+  .md-toolbar button {
+    padding: 7px 9px;
+  }
+}

@@ -2258,12 +2258,20 @@ function uploadFiles(files) {
 app = $('#app');
 bindMediaDelegates();
 if (loggedIn()) {
-  // 校验 token 的同时刷新用户名（token 里才有真实身份，localStorage 可能是旧值）
+  // 校验 token 的同时刷新用户名（token 里才有真实身份，localStorage 可能是旧值）；
+  // 后端滑续期换发了新令牌就接住，活跃用户不再被 12h 时效半路踢下线
   api('GET', 'session')
     .then(function (data) {
       if (data.user && data.user !== state.user) {
         state.user = data.user;
         localStorage.setItem('cms-user', state.user);
+      }
+      if (data.token && data.expiresAt) {
+        state.token = data.token;
+        state.expiresAt = data.expiresAt;
+        localStorage.setItem('cms-token', data.token);
+        localStorage.setItem('cms-expires', String(data.expiresAt));
+        toast('登录状态已自动续期');
       }
     })
     .catch(function () {});
