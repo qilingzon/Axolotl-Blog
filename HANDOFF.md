@@ -5,6 +5,7 @@
 ## 当前状态
 
 - 工程：D:\zcodework\blog / Astro 5.18.2 纯静态博客 / 主题：Minecraft 紫粉美西螈 / 线上 **www.iqii.cn**（EdgeOne Pages）
+- **RSS 订阅（2026-11-03，d053b49）**：`src/pages/rss.xml.js`（@astrojs/rss 官方包）输出全站已发布文章，草稿过滤口径同前台（临时草稿构建实测仍 7 条不含草稿），zh-cn + 绝对链接 + 分类标签，页脚加「RSS 订阅」入口。线上已验：/rss.xml 200、7 items、含最新文章。**坑：RSS 是单行 XML，线上验证用 `grep -o '<item>' | wc -l` 数出现次数，`grep -c` 数行数会误报 1**
 - **文章列表分页（2026-11-03，9895e14/ed97bb2）**：每页 10 篇客户端分页（页码按钮 + ‹› + 「第 X / Y 页 · 共 N 篇」）；筛选变化重置回第 1 页；**单页时连控件容器都不渲染**（小数据量界面与从前一字不差，负优化禁令）。E2E：12 篇实测（页 1 = 10 行、页 2 = 2 行且首行按日期排序正确、搜索命中 5 篇单页控件隐藏、草稿筛选空态、清空恢复 10 行 + 控件回归），测试文已删净，线上指纹已验
 - **媒体库类型筛选（2026-11-03，7034aec/f8b7ad1）**：全部/PNG/JPG/WebP/GIF/AVIF 下拉（>3 张图时与搜索框一同出现），与文件名搜索叠加过滤（ext === type，jpeg 归并 jpg），复用现有 gridHtml/attachDims 过滤管线与空态。E2E：4 张图实测 webp=2/png=1/jpg=1/组合搜索+类型=1/清空恢复 4，测试图已清理，线上指纹已验
 - **仪表盘「最近活动」卡片（2026-11-03，c77077f/2f69ec6）**：新增 GET /api/activity（整仓最近 5 条提交，复用 commits API + trimCommit 共享裁剪，字段口径同 history），前端 ENDPOINTS 表加 activity 条目（安全底线未放宽），仪表盘在「最近文章」下方渲染 act-row 列表（fmtStamp 月-日 时:分 + 说明 + 短 sha，保存/上传/回滚落库可见）；动态获取失败降级为「暂时取不到动态，不影响使用」，不影响主体。E2E：API 5 条正确（GBK 控制台乱码只是显示编码，JSON UTF-8 无损）、浏览器快照卡片完整、线上 app.js 指纹已验。**坑：PowerShell 重启演示服务前必须先 taskkill 旧进程，否则新实例 EADDRINUSE 静默死亡、老进程继续答 404；IAB goto 同源哈希 URL 不重载 JS，改代码后必须 tab.reload()**
