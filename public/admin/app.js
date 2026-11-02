@@ -549,10 +549,16 @@ function renderPosts(mode) {
         '</select>' +
         '<label class="draft-filter" title="只显示存为草稿的文章"><input type="checkbox" id="post-draft" ' + (mode === 'draft' ? 'checked' : '') + '>只看草稿</label>' +
         '<a class="btn" href="#/editor/new">写新文章</a></div>' +
-        '<div id="post-list">' + posts.map(postRowHtml).join('') + '</div>';
+        '<div id="post-list">' + posts.map(postRowHtml).join('') + '</div>' +
+        '<div id="post-pager"></div>';
       renderShell('posts', html);
       var listEl = $('#post-list');
-      function refresh() {
+      var pagerEl = $('#post-pager');
+      var PAGE_SIZE = 10;
+      var page = 1;
+
+      function refresh(resetPage) {
+        if (resetPage) page = 1;
         var kw = $('#post-search').value.trim().toLowerCase();
         var tag = $('#post-tag').value;
         var draftOnly = $('#post-draft').checked;
@@ -568,14 +574,52 @@ function renderPosts(mode) {
           var hitDraft = !draftOnly || p.draft;
           return hitKw && hitTag && hitDraft;
         });
-        listEl.innerHTML = filtered.length
-          ? filtered.map(postRowHtml).join('')
+        var totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+        if (page > totalPages) page = totalPages;
+        // 单页不渲染分页控件：小数据量下界面与从前一字不差（负优化禁令）
+        if (totalPages > 1) {
+          var btns = '';
+          for (var i = 1; i <= totalPages; i++) {
+            btns +=
+              '<button type="button" class="pager__num' + (i === page ? ' active' : '') +
+              '" data-page="' + i + '">' + i + '</button>';
+          }
+          pagerEl.innerHTML =
+            '<div class="pager">' +
+            '<button type="button" class="pager__num" data-page="' + (page - 1) + '"' +
+            (page <= 1 ? ' disabled' : '') + '>‹</button>' +
+            btns +
+            '<button type="button" class="pager__num" data-page="' + (page + 1) + '"' +
+            (page >= totalPages ? ' disabled' : '') + '>›</button>' +
+            '<span class="pager__info">第 ' + page + ' / ' + totalPages + ' 页 · 共 ' + filtered.length + ' 篇</span>' +
+            '</div>';
+        } else {
+          pagerEl.innerHTML = '';
+        }
+        var slice = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+        listEl.innerHTML = slice.length
+          ? slice.map(postRowHtml).join('')
           : '<div class="empty-tip"><img src="/assets/axolotl-wild.png" alt=""><br>没有匹配的文章</div>';
       }
-      $('#post-search').addEventListener('input', refresh);
-      $('#post-tag').addEventListener('change', refresh);
-      $('#post-draft').addEventListener('change', refresh);
-      refresh();
+      function goPage(target) {
+        page = target;
+        refresh(false);
+      }
+      $('#post-search').addEventListener('input', function () {
+        refresh(true);
+      });
+      $('#post-tag').addEventListener('change', function () {
+        refresh(true);
+      });
+      $('#post-draft').addEventListener('change', function () {
+        refresh(true);
+      });
+      pagerEl.addEventListener('click', function (e) {
+        var btn = e.target.closest('button[data-page]');
+        if (!btn || btn.disabled) return;
+        goPage(Number(btn.dataset.page));
+      });
+      refresh(false);
       if (mode === 'tags') {
         var sel = $('#post-tag');
         if (sel) sel.focus();

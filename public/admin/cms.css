@@ -1480,3 +1480,47 @@ a.stat:hover {
   color: var(--text-muted);
   flex-shrink: 0;
 }
+
+/* ---------- 文章列表分页（仅多页时渲染） ---------- */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px 0 4px;
+  flex-wrap: wrap;
+}
+
+.pager__num {
+  min-width: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pager__num:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pager__num.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.pager__num:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.pager__info {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-left: 8px;
+}
