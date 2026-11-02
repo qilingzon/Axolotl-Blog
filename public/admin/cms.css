@@ -967,6 +967,39 @@ a.stat:hover {
   padding: 60px 0;
 }
 
+/* 加载骨架：文案下的三行微光占位，暗示内容形状（prefers-reduced-motion 时不闪） */
+.loading::after {
+  content: '';
+  display: block;
+  max-width: 420px;
+  margin: 18px auto 0;
+  height: 54px;
+  border-radius: var(--radius-sm);
+  background:
+    linear-gradient(90deg, var(--bg-soft) 25%, var(--surface) 45%, var(--bg-soft) 65%) 0 0 / 100% 14px no-repeat,
+    linear-gradient(90deg, var(--bg-soft) 25%, var(--surface) 45%, var(--bg-soft) 65%) 0 26px / 84% 14px no-repeat,
+    linear-gradient(90deg, var(--bg-soft) 25%, var(--surface) 45%, var(--bg-soft) 65%) 0 52px / 62% 14px no-repeat;
+  animation: loading-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes loading-shimmer {
+  from {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.65;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading::after {
+    animation: none;
+  }
+}
+
 /* ---------- 编辑器顶栏（模式切换 / 字数 / 专注 / 预览） ---------- */
 
 .hidden {
