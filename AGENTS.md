@@ -10,3 +10,4 @@
 - 文章内容放 `src/content/blog/*.md`，frontmatter 遵循 `src/content.config.ts` 的 schema（CMS 保存时会按 schema 序列化，改字段要同步 CMS 表单与 API 的 normalizeMeta）。
 - **git push 常设授权（2026-10-25 用户授予）**：每个任务 commit 完成后直接 push 到 origin，不必再问；推送前仍须满足通用纪律（build/测试先过）。适用于本仓库与 Axolotl-CMS 独立仓库。
 - **`cms-test` 是用户本地演示的常设分支**（`.env.local` 指向它）：任何会话测试后都不得删除，删了用户本地后台就会"池塘还空着/读不到分支"。测试请自建 `cms-selftest-*` 等一次性分支，测完删自己的。
+- **EdgeOne 部署配额约 500 次/月（2026-11-03 用户提醒）**：push master 会触发 EdgeOne 重部署吃配额。自动推送授权仍然有效，但**要攒批**——同一时间窗的多项改动 commit 后一次 push；纯 docs/测试/备份类提交不单独触发推送，攒到下一次功能批次一起推；不要为验证部署指纹而特意连续 push（线上指纹验证每批次最多一次，等 1–2 分钟再查，EdgeOne 构建约 1 分钟）。
