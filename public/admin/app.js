@@ -734,6 +734,13 @@ function renderMarkdown(src) {
       }
       continue;
     }
+    // 独立成行的 <img>（图片块设过宽度）原样透传——预览与线上渲染口径一致
+    if (!inCode && /^\s*<img\s/.test(line)) {
+      flushPara();
+      flushList();
+      out.push(line.trim());
+      continue;
+    }
     if (inCode) {
       codeBuf.push(line);
       continue;
@@ -935,7 +942,14 @@ function parseBlocks(md) {
     var im = line.match(/^\s*!\[([^\]]*)\]\(([^)\s]+)\)\s*$/);
     if (im) {
       flushPara();
-      blocks.push({ type: 'img', alt: im[1], url: im[2] });
+      blocks.push({ type: 'img', alt: im[1], url: im[2], width: '100' });
+      continue;
+    }
+    // 自家序列化的 HTML 图片（设过宽度的块）：按固定属性顺序解析，其余 HTML 行落 raw 兜底
+    var him = line.match(/^\s*<img\s+src="([^"]*)"(?:\s+alt="([^"]*)")?(?:\s+style="[^"]*max-width:\s*(\d+)%[^"]*")?\s*\/?\s*>\s*$/);
+    if (him) {
+      flushPara();
+      blocks.push({ type: 'img', alt: him[2] || '', url: him[1], width: him[3] || '100' });
       continue;
     }
     para.push(line);
@@ -954,7 +968,14 @@ function blocksToMarkdown(blocks) {
     if (b.type === 'quote') {
       return String(b.text || '').split('\n').map(function (l) { return '> ' + l; }).join('\n');
     }
-    if (b.type === 'img') return '![' + (b.alt || '') + '](' + (b.url || '') + ')';
+    if (b.type === 'img') {
+      // 设过宽度（≠100）才落 HTML 形式，默认全宽保持标准 Markdown——存量文章字节不变形
+      var w = String(b.width || '100');
+      if (w !== '100') {
+        return '<img src="' + (b.url || '') + '" alt="' + (b.alt || '') + '" style="max-width:' + w + '%" />';
+      }
+      return '![' + (b.alt || '') + '](' + (b.url || '') + ')';
+    }
     if (b.type === 'code') return '```\n' + b.text + '\n```';
     if (b.type === 'raw') return b.text;
     if (b.type === 'list') {
@@ -1079,10 +1100,17 @@ function createBlockEditor(deps) {
       return rows + '<button type="button" class="blk__op blk__more" data-op="addtask">＋ 一项</button>';
     }
     if (b.type === 'img') {
+      var curW = String(b.width || '100');
       return (
         '<div class="blk__imgrow">' +
         '<input type="text" data-f="alt" value="' + esc(b.alt || '') + '" placeholder="图片说明（可不填）">' +
         '<input type="text" data-f="url" value="' + esc(b.url || '') + '" placeholder="图片地址">' +
+        '<select data-f="width" title="图片显示宽度">' +
+        '<option value="100"' + (curW === '100' ? ' selected' : '') + '>全宽</option>' +
+        '<option value="75"' + (curW === '75' ? ' selected' : '') + '>75%</option>' +
+        '<option value="60"' + (curW === '60' ? ' selected' : '') + '>60%</option>' +
+        '<option value="50"' + (curW === '50' ? ' selected' : '') + '>50%</option>' +
+        '</select>' +
         '<button type="button" class="btn btn--sm" data-op="pick">选图片</button>' +
         '</div>' +
         '<div class="blk__thumbwrap' + (b.url ? '' : ' hidden') + '"><img class="blk__thumb" data-role="thumb" src="' + esc(b.url || '') + '" alt=""></div>' +
@@ -1154,6 +1182,7 @@ function createBlockEditor(deps) {
     if (!f) return;
     if (f === 'text') b.text = t.value;
     else if (f === 'alt') b.alt = t.value;
+    else if (f === 'width') b.width = t.value;
     else if (f === 'url') {
       b.url = t.value.trim();
       var tw = card.querySelector('.blk__thumbwrap');
@@ -1251,6 +1280,14 @@ function createBlockEditor(deps) {
       var card2 = e.target.closest('.blk');
       var b2 = blocks[Number(card2.dataset.idx)];
       if (b2) b2.items[Number(e.target.dataset.i)].done = e.target.checked;
+      changed('input');
+      return;
+    }
+    // 尺寸下拉的 change 兜底（部分浏览器 select 不派发 input）
+    if (e.target.dataset && e.target.dataset.f === 'width') {
+      var card3 = e.target.closest('.blk');
+      var b3 = blocks[Number(card3.dataset.idx)];
+      if (b3) b3.width = e.target.value;
       changed('input');
     }
   });

@@ -469,6 +469,12 @@ a.card:hover {
   border: var(--border-w) solid var(--border);
 }
 
+/* 带内联宽度的图片（CMS 图片块选过尺寸）块级居中；不碰无 style 的存量图 */
+.prose img[style] {
+  display: block;
+  margin-inline: auto;
+}
+
 .prose hr {
   border: none;
   border-top: var(--border-w) dashed var(--border);
