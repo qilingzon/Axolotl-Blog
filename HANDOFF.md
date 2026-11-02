@@ -67,3 +67,4 @@
 - 像素字体：@fontsource/fusion-pixel-12px-proportional-sc（本地打包，零 CDN 依赖）。
 - 美术：吉祥物 = 启动器图标位图（用户指定，唯一位图例外）；其余装饰为内联 SVG/CSS；favicon.png 同源图标。
 - 验收证据：screenshots/*.png（初版 9 张 + mascot-* 4 张启动器形象版）。
+- **图片块宽度设置（2026-11-03 本地攒批）**：小白图片块加尺寸下拉（全宽/75/60/50）；≠100 序列化为 <img style=max-width> （parseBlocks 认自家固定属性顺序，其余 HTML 行仍落 raw 兜底无损）；renderMarkdown 独立 img 行透传；前台 .prose img[style] 块级居中（不碰存量图）。E2E：60% → 进阶模式 HTML 精确 → 回小白还原 → 预览透传 img[style]。随下批推送
