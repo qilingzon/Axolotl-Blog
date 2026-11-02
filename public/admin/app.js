@@ -2193,6 +2193,7 @@ function renderMedia() {
                     '<div class="media-item__ops">' +
                     '<button class="btn btn--ghost btn--sm" data-copy="' + esc(im.url) + '" title="复制 Markdown 引用">MD</button>' +
                     '<button class="btn btn--ghost btn--sm" data-copyurl="' + esc(im.url) + '" title="复制原始链接">链接</button>' +
+                    '<button class="btn btn--ghost btn--sm" data-rename="' + esc(im.name) + '" title="改一个看得懂的名字">改名</button>' +
                     '<button class="btn btn--danger btn--sm" data-del="' + esc(im.name) + '">删</button>' +
                     '</div></div>'
                   );
@@ -2331,11 +2332,65 @@ function bindMediaDelegates() {
         });
       return;
     }
+    var renameBtn = e.target.closest('button[data-rename]');
+    if (renameBtn) {
+      renameImageFlow(renameBtn.dataset.rename);
+      return;
+    }
     var delBtn = e.target.closest('button[data-del]');
     if (delBtn) {
       deleteImageFlow(delBtn.dataset.del);
     }
   });
+}
+
+/** 重命名图片：输入新名的弹窗；被引用时服务端会拒绝（409 原样提示） */
+function renameImageFlow(name) {
+  var mask = document.createElement('div');
+  mask.className = 'modal-mask';
+  mask.innerHTML =
+    '<div class="modal"><h3>重命名图片</h3>' +
+    '<p class="modal__tip">改一个看得懂的名字，扩展名别动；被文章引用的图不允许改名。</p>' +
+    '<div class="field"><input id="rename-input" value="' + esc(name) + '" autocomplete="off" spellcheck="false"></div>' +
+    '<p class="form-error" id="rename-error"></p>' +
+    '<div class="modal__actions">' +
+    '<button class="btn btn--ghost" data-act="no">取消</button>' +
+    '<button class="btn" data-act="yes">重命名</button>' +
+    '</div></div>';
+  document.body.appendChild(mask);
+  var input = mask.querySelector('#rename-input');
+  var errEl = mask.querySelector('#rename-error');
+  input.focus();
+  input.select();
+  function close() {
+    document.removeEventListener('keydown', onKey);
+    mask.remove();
+  }
+  function onKey(e) {
+    if (e.key === 'Escape' && document.querySelectorAll('.modal-mask').length <= 1) close();
+  }
+  mask.addEventListener('click', function (e) {
+    var act = e.target.getAttribute && e.target.getAttribute('data-act');
+    if (act === 'no') close();
+    else if (e.target === mask) close();
+    else if (act === 'yes') {
+      var to = input.value.trim();
+      if (!to || to === name) return;
+      var btn = mask.querySelector('[data-act="yes"]');
+      btn.disabled = true;
+      api('PATCH', 'media', { query: { name: name }, body: { name: to } })
+        .then(function (res) {
+          close();
+          toast((res && res.warn ? res.warn + ' ' : '') + '已重命名为 ' + to, !!(res && res.warn));
+          renderMedia();
+        })
+        .catch(function (err) {
+          errEl.textContent = err.message;
+          btn.disabled = false;
+        });
+    }
+  });
+  document.addEventListener('keydown', onKey);
 }
 
 /**

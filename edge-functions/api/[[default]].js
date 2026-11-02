@@ -284,6 +284,7 @@ export async function onRequest(context) {
     if (path === '/api/media' && method === 'GET') return await handleListMedia();
     if (path === '/api/media' && method === 'POST') return await handleUploadMedia(request);
     if (path === '/api/media' && method === 'DELETE') return await handleDeleteMedia(url);
+    if (path === '/api/media' && method === 'PATCH') return await handleRenameMedia(request, url);
     return fail('接口不存在', 404);
   } catch (err) {
     // 上游 404 原样透传（各 handler 已改写为中文文案）；其余上游错误按网关错误处理。
@@ -429,8 +430,8 @@ function postFromText(name, sha, text) {
   return { slug: name.replace(/\.md$/, ''), sha, ...normalizeMeta(meta), body };
 }
 
-async function handleListPosts() {
-  let posts = null;
+/** 拉全部文章（含正文，含草稿）——列表接口与媒体引用扫描共用 */
+async function fetchAllPosts() {
   try {
     const [owner, name] = String(CFG.repo()).split('/');
     const data = await ghGraphQL(LIST_POSTS_QUERY, {
@@ -440,23 +441,30 @@ async function handleListPosts() {
     });
     // object 为 null = 分支或目录不存在（不是空目录）——直接说清楚，别伪装成"池塘还空着"
     if (!data.repository || !data.repository.object) {
-      return fail('文章目录读不到：CMS_BRANCH 指向的分支不存在，请检查配置', 502);
+      const err = new Error('CMS_BRANCH 指向的分支不存在');
+      err.status = 502;
+      throw err;
     }
     const entries = data.repository.object.entries || [];
-    posts = entries
+    return entries
       .filter((e) => e.object && e.name.endsWith('.md'))
       .map((e) => postFromText(e.name, e.object.oid, e.object.text));
-  } catch {
-    // 回退：REST 目录 + 逐篇 GET（GraphQL 不可用时后台照常工作）
+  } catch (e) {
+    // GraphQL 不可用时回退 REST 目录 + 逐篇 GET；分支不存在等非 404 错误继续抛
+    if (e && e.status === 502) throw e;
     const files = await ghFetch(repoSegments('contents', POSTS_DIR));
     const mdFiles = files.filter((f) => f.type === 'file' && f.name.endsWith('.md'));
-    posts = await Promise.all(
+    return Promise.all(
       mdFiles.map(async (f) => {
         const item = await ghFetch(repoSegments('contents', f.path));
         return postFromText(f.name, item.sha, dec.decode(b64ToBytes(item.content || '')));
       })
     );
   }
+}
+
+async function handleListPosts() {
+  const posts = await fetchAllPosts();
   posts.sort((a, b) => String(b.pubDate).localeCompare(String(a.pubDate)));
   return json({ posts });
 }
@@ -676,6 +684,66 @@ async function handleUploadMedia(request) {
     },
   });
   return json({ ok: true, name, url: `/assets/uploads/${name}`, overwritten: !!existing });
+}
+
+/**
+ * PATCH /api/media?name=旧名（body: {name: 新名}）：重命名图片。
+ * 安全范围：被文章引用的图直接拒绝（明确报数量）——自动改写引用涉及逐篇 PUT，风险大于收益；
+ * 未被引用的图 = 刚传错名想改的最常见场景。流程 新传→旧删，旧删失败带 warn（与文章改名同口径）。
+ */
+async function handleRenameMedia(request, url) {
+  const from = url.searchParams.get('name') || '';
+  if (!IMG_NAME_RE.test(from)) return fail('旧文件名不合法');
+  let input;
+  try {
+    input = await request.json();
+  } catch {
+    return fail('请求格式错误');
+  }
+  const to = String((input && input.name) || '');
+  if (!IMG_NAME_RE.test(to)) return fail('新文件名不合法（仅 png/jpg/webp/gif/avif）');
+  if (from === to) return fail('名字没变');
+  const fromPath = `${MEDIA_DIR}/${from}`;
+  const toPath = `${MEDIA_DIR}/${to}`;
+
+  const posts = await fetchAllPosts();
+  const refs = posts.filter((p) => String(p.body || '').indexOf('/assets/uploads/' + from) !== -1);
+  if (refs.length) {
+    return fail(
+      `有 ${refs.length} 篇文章正在引用它（${refs
+        .map((p) => '《' + (p.title || p.slug) + '》')
+        .join('、')}），重命名会让它们裂图；请先在文章里换成新图再删除`,
+      409
+    );
+  }
+
+  const old = await ghFetch(repoSegments('contents', fromPath)).catch((e) => {
+    if (e.status === 404) e.message = '图片不存在';
+    throw e;
+  });
+  const existing = await ghFetch(repoSegments('contents', toPath)).catch((e) => {
+    if (e.status === 404) return null;
+    throw e;
+  });
+  if (existing) return fail('已有同名图片，请换一个名字', 409);
+
+  await ghFetch(repoSegments('contents', toPath), {
+    method: 'PUT',
+    body: {
+      message: `CMS: 重命名图片 ${from} → ${to}`,
+      // contents GET 的 base64 内嵌换行，PUT 前清掉（与版本回滚同口径）
+      content: String(old.content || '').replace(/\s+/g, ''),
+      branch: CFG.branch(),
+    },
+  });
+  let warn = '';
+  await ghFetch(repoSegments('contents', fromPath), {
+    method: 'DELETE',
+    body: { message: `CMS: 重命名图片 ${from} → ${to}`, sha: old.sha, branch: CFG.branch() },
+  }).catch((e) => {
+    warn = `新名字已就绪，但旧文件 ${from} 删除失败：${(e && e.message) || '未知错误'}，请稍后手动删除`;
+  });
+  return json({ ok: true, name: to, url: '/assets/uploads/' + to, ...(warn ? { warn } : {}) });
 }
 
 async function handleDeleteMedia(url) {
