@@ -2049,9 +2049,38 @@ function bindEditor(origSlug, post) {
 
 function renderMedia() {
   renderShell('media', loadingTip('媒体库打开中……'));
+  // 引用计数的数据源与删图检查同口径（含草稿）；列表拿不到就降级隐藏徽标，不挡媒体库
+  var postsReady =
+    state.postsCache && state.postsCache.map
+      ? Promise.resolve(state.postsCache)
+      : api('GET', 'posts')
+          .then(function (d) {
+            state.postsCache = d.posts || [];
+            return state.postsCache;
+          })
+          .catch(function () {
+            return null;
+          });
   api('GET', 'media')
     .then(function (data) {
-      var images = data.images || [];
+      return postsReady.then(function (list) {
+        return { data: data, list: list };
+      });
+    })
+    .then(function (both) {
+      var images = both.data.images || [];
+      var list = both.list;
+      // name → 被多少篇文章正文引用（含草稿）
+      var useMap = null;
+      if (list && list.map) {
+        useMap = {};
+        images.forEach(function (im) {
+          var needle = '/assets/uploads/' + im.name;
+          useMap[im.name] = list.filter(function (p) {
+            return String(p.body || '').indexOf(needle) !== -1;
+          }).length;
+        });
+      }
 
       function gridHtml(list) {
         return list.length
@@ -2063,6 +2092,10 @@ function renderMedia() {
                     '<div class="media-item__bar"><span class="media-item__name" title="' + esc(im.name) + '">' +
                     esc(im.name) + '（' + fmtSize(im.size) + '）</span>' +
                     '<span class="media-item__dims"></span></div>' +
+                    (useMap
+                      ? '<div class="media-item__refs' + (useMap[im.name] ? '' : ' media-item__refs--none') + '">' +
+                        (useMap[im.name] ? '被 ' + useMap[im.name] + ' 篇文章引用' : '暂无文章使用') + '</div>'
+                      : '') +
                     '<div class="media-item__ops">' +
                     '<button class="btn btn--ghost btn--sm" data-copy="' + esc(im.url) + '" title="复制 Markdown 引用">MD</button>' +
                     '<button class="btn btn--ghost btn--sm" data-copyurl="' + esc(im.url) + '" title="复制原始链接">链接</button>' +
