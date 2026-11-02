@@ -278,6 +278,9 @@ export async function onRequest(context) {
     if (path.startsWith('/api/version/') && method === 'PUT') {
       return await handleVersionRestore(path.slice('/api/version/'.length), request);
     }
+    if (path === '/api/activity' && method === 'GET') {
+      return await handleActivity();
+    }
     if (path === '/api/media' && method === 'GET') return await handleListMedia();
     if (path === '/api/media' && method === 'POST') return await handleUploadMedia(request);
     if (path === '/api/media' && method === 'DELETE') return await handleDeleteMedia(url);
@@ -550,6 +553,27 @@ async function handlePostItem(method, slug, request) {
 /** git ref 白名单：仅接受 commit sha（7-40 位十六进制），防任意 ref/分支注入 */
 const SHA_RE = /^[0-9a-f]{7,40}$/i;
 
+/** 裁剪 GitHub commit 对象：只留展示所需字段，不透传原始结构 */
+function trimCommit(c) {
+  return {
+    sha: c.sha,
+    short: String(c.sha || '').slice(0, 7),
+    date: (c.commit && c.commit.author && c.commit.author.date) || '',
+    message: String((c.commit && c.commit.message) || '')
+      .split('\n')[0]
+      .slice(0, 80),
+    author: (c.commit && c.commit.author && c.commit.author.name) || '',
+  };
+}
+
+/** GET /api/activity：整仓最近 5 次提交（仪表盘「最近活动」卡片，保存落库可见） */
+async function handleActivity() {
+  const commits = await ghFetch(repoSegments('commits'), {
+    query: { per_page: '5', sha: CFG.branch() },
+  });
+  return json({ commits: (Array.isArray(commits) ? commits : []).map(trimCommit) });
+}
+
 /** GET /api/history/{slug}：这篇文章最近 15 次提交（裁剪字段，不透传 GitHub 原始对象） */
 async function handleHistory(slug) {
   if (!SLUG_RE.test(slug)) return fail('文件名只能包含字母、数字、点、下划线和短横线');
@@ -558,15 +582,7 @@ async function handleHistory(slug) {
     // commits API 选分支的参数是 sha（不是 contents 用的 ref），必须显式传，否则落在默认分支上查不到
     query: { path: filePath, per_page: '15', sha: CFG.branch() },
   });
-  const versions = (Array.isArray(commits) ? commits : []).map((c) => ({
-    sha: c.sha,
-    short: String(c.sha || '').slice(0, 7),
-    date: (c.commit && c.commit.author && c.commit.author.date) || '',
-    message: String((c.commit && c.commit.message) || '')
-      .split('\n')[0]
-      .slice(0, 80),
-    author: (c.commit && c.commit.author && c.commit.author.name) || '',
-  }));
+  const versions = (Array.isArray(commits) ? commits : []).map(trimCommit);
   return json({ versions });
 }
 

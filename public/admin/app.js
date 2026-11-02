@@ -50,6 +50,17 @@ function fmtDate(iso) {
   return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
 }
 
+/** 月-日 时:分（最近活动行用：关心的是"今天几点存的"） */
+function fmtStamp(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  if (isNaN(d)) return String(iso);
+  var p = function (n) {
+    return String(n).padStart(2, '0');
+  };
+  return p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+
 function fmtSize(n) {
   if (!n && n !== 0) return '';
   if (n < 1024) return n + ' B';
@@ -229,6 +240,7 @@ var ENDPOINTS = {
   session: '/api/session',
   posts: '/api/posts',
   history: '/api/history',
+  activity: '/api/activity',
   version: '/api/version',
   media: '/api/media',
 };
@@ -428,6 +440,14 @@ function renderDashboard() {
     'dashboard',
     loadingTip('池塘数据搬运中……')
   );
+  // 最近动态是锦上添花：拿不到（网络/权限抖动）就降级成一句话，不影响仪表盘主体
+  var activity = api('GET', 'activity')
+    .then(function (d) {
+      return d.commits || [];
+    })
+    .catch(function () {
+      return null;
+    });
   api('GET', 'posts')
     .then(function (data) {
       var posts = data.posts || [];
@@ -442,20 +462,42 @@ function renderDashboard() {
         return p.draft;
       }).length;
       var latest = posts.slice(0, 6);
-      var html =
-        '<div class="page-head"><h1>仪表盘</h1><span class="spacer"></span>' +
-        '<a class="btn" href="#/editor/new">写新文章</a></div>' +
-        '<div class="stats">' +
-        statCard(posts.length, '篇文章', '/assets/axolotl-cyan.png', '#/posts', '看全部文章') +
-        statCard(Object.keys(tags).length, '个标签', '/assets/axolotl-gold.png', '#/posts/tags', '按标签筛选') +
-        statCard(drafts, '篇草稿', '/assets/axolotl-wild.png', '#/posts/draft', '只看草稿') +
-        '</div>' +
-        '<div class="card"><h3 style="margin-top:0">最近文章</h3>' +
-        (latest.length
-          ? latest.map(postRowHtml).join('')
-          : '<div class="empty-tip">池塘还空着，去写第一篇吧</div>') +
-        '</div>';
-      renderShell('dashboard', html);
+      return activity.then(function (commits) {
+        var actHtml;
+        if (commits === null) {
+          actHtml = '<div class="empty-tip">暂时取不到动态，不影响使用</div>';
+        } else if (!commits.length) {
+          actHtml = '<div class="empty-tip">还没有任何保存记录</div>';
+        } else {
+          actHtml = commits
+            .map(function (c) {
+              return (
+                '<div class="act-row"><span class="act-row__date">' +
+                esc(fmtStamp(c.date) || '') + '</span><span class="act-row__msg" title="' +
+                esc(c.message || '') + '">' + esc(c.message || '（无提交说明）') +
+                '</span><span class="act-row__sha">' + esc(c.short || '') + '</span></div>'
+              );
+            })
+            .join('');
+        }
+        var html =
+          '<div class="page-head"><h1>仪表盘</h1><span class="spacer"></span>' +
+          '<a class="btn" href="#/editor/new">写新文章</a></div>' +
+          '<div class="stats">' +
+          statCard(posts.length, '篇文章', '/assets/axolotl-cyan.png', '#/posts', '看全部文章') +
+          statCard(Object.keys(tags).length, '个标签', '/assets/axolotl-gold.png', '#/posts/tags', '按标签筛选') +
+          statCard(drafts, '篇草稿', '/assets/axolotl-wild.png', '#/posts/draft', '只看草稿') +
+          '</div>' +
+          '<div class="card"><h3 style="margin-top:0">最近文章</h3>' +
+          (latest.length
+            ? latest.map(postRowHtml).join('')
+            : '<div class="empty-tip">池塘还空着，去写第一篇吧</div>') +
+          '</div>' +
+          '<div class="card"><h3 style="margin-top:0">最近活动</h3><p class="act-tip">保存、上传、回滚都会在这里留下痕迹，看到就说明真的存进仓库了</p>' +
+          actHtml +
+          '</div>';
+        renderShell('dashboard', html);
+      });
     })
     .catch(function (err) {
       renderShell('dashboard', '<div class="empty-tip">' + esc(err.message) + '</div>');
