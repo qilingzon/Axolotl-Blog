@@ -518,15 +518,32 @@ function statCard(num, label, img, href, tip) {
     : '<div class="stat">' + inner + '</div>';
 }
 
-function postRowHtml(p) {
+function postRowHtml(p, kw) {
   var img = (ACCENTS.find(function (a) { return a.id === p.accent; }) || ACCENTS[0]).img;
+  // 搜索命中在正文（标题没命中）时给一行上下文片段，命中段包 mark；不传 kw 则无此行
+  var snippet = '';
+  if (kw && String(p.title || '').toLowerCase().indexOf(kw) === -1) {
+    var body = String(p.body || '');
+    var idx = body.toLowerCase().indexOf(kw);
+    if (idx !== -1) {
+      var start = Math.max(0, idx - 26);
+      var end = Math.min(body.length, idx + kw.length + 44);
+      snippet =
+        '<div class="post-row__snippet">' + (start > 0 ? '…' : '') +
+        esc(body.slice(start, idx)) +
+        '<mark class="search-hit">' + esc(body.slice(idx, idx + kw.length)) + '</mark>' +
+        esc(body.slice(idx + kw.length, end)) +
+        (end < body.length ? '…' : '') + '</div>';
+    }
+  }
   return (
     '<a class="post-row" href="#/editor/' + encodeURIComponent(p.slug) + '">' +
     '<img src="' + img + '" alt="">' +
     '<div class="post-row__main"><div class="post-row__title">' + esc(p.title) +
     (p.draft ? ' <span class="badge-draft">草稿</span>' : '') + '</div>' +
     '<div class="post-row__meta"><span>' + fmtDate(p.pubDate) + '</span>' +
-    '<span>' + (p.tags || []).map(function (t) { return '<span class="tag-chip">' + esc(t) + '</span>'; }).join(' ') + '</span></div></div>' +
+    '<span>' + (p.tags || []).map(function (t) { return '<span class="tag-chip">' + esc(t) + '</span>'; }).join(' ') + '</span></div>' +
+    snippet + '</div>' +
     '<span class="save-state">编辑 →</span></a>'
   );
 }
@@ -603,7 +620,7 @@ function renderPosts(mode) {
         }
         var slice = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
         listEl.innerHTML = slice.length
-          ? slice.map(postRowHtml).join('')
+          ? slice.map(function (p) { return postRowHtml(p, kw); }).join('')
           : '<div class="empty-tip"><img src="/assets/axolotl-wild.png" alt=""><br>没有匹配的文章</div>';
         // 搜索命中高亮：TreeWalker 只包文本节点里的匹配段，不碰已转义的 HTML 结构
         if (kw) {

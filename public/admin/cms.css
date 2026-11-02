@@ -455,6 +455,17 @@ a.stat:hover {
   flex-wrap: wrap;
 }
 
+/* 搜索正文命中片段（仅搜索时出现） */
+.post-row__snippet {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 5px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
 .tag-chip {
   display: inline-block;
   padding: 0 8px;
