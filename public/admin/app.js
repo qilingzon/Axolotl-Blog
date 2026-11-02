@@ -2192,15 +2192,15 @@ function renderMedia() {
     .then(function (both) {
       var images = both.data.images || [];
       var list = both.list;
-      // name → 被多少篇文章正文引用（含草稿）
-      var useMap = null;
+      // name → 引用它的文章数组（含草稿）；计数与「查看引用」弹窗共用
+      var refsMap = null;
       if (list && list.map) {
-        useMap = {};
+        refsMap = {};
         images.forEach(function (im) {
           var needle = '/assets/uploads/' + im.name;
-          useMap[im.name] = list.filter(function (p) {
+          refsMap[im.name] = list.filter(function (p) {
             return String(p.body || '').indexOf(needle) !== -1;
-          }).length;
+          });
         });
       }
 
@@ -2214,9 +2214,11 @@ function renderMedia() {
                     '<div class="media-item__bar"><span class="media-item__name" title="' + esc(im.name) + '">' +
                     esc(im.name) + '（' + fmtSize(im.size) + '）</span>' +
                     '<span class="media-item__dims"></span></div>' +
-                    (useMap
-                      ? '<div class="media-item__refs' + (useMap[im.name] ? '' : ' media-item__refs--none') + '">' +
-                        (useMap[im.name] ? '被 ' + useMap[im.name] + ' 篇文章引用' : '暂无文章使用') + '</div>'
+                    (refsMap
+                      ? (refsMap[im.name] && refsMap[im.name].length
+                        ? '<button type="button" class="media-item__refs" data-showrefs="' + esc(im.name) + '" title="点开看引用它的文章">被 ' +
+                          refsMap[im.name].length + ' 篇文章引用</button>'
+                        : '<div class="media-item__refs media-item__refs--none">暂无文章使用</div>')
                       : '') +
                     '<div class="media-item__ops">' +
                     '<button class="btn btn--ghost btn--sm" data-copy="' + esc(im.url) + '" title="复制 Markdown 引用">MD</button>' +
@@ -2259,6 +2261,10 @@ function renderMedia() {
         '<div id="media-list">' + gridHtml(images) + '</div>';
       renderShell('media', html);
       attachDims($('#media-list'));
+      $('#media-list').addEventListener('click', function (e) {
+        var badge = e.target.closest('button[data-showrefs]');
+        if (badge) openRefsModal(badge.dataset.showrefs, refsMap ? refsMap[badge.dataset.showrefs] : null);
+      });
       var searchEl = $('#media-search');
       var typeEl = $('#media-type');
       if (searchEl || typeEl) {
@@ -2417,6 +2423,49 @@ function renameImageFlow(name) {
           btn.disabled = false;
         });
     }
+  });
+  document.addEventListener('keydown', onKey);
+}
+
+/** 「查看引用」弹窗：列出引用该图片的文章，点一条直达编辑器 */
+function openRefsModal(name, refs) {
+  var mask = document.createElement('div');
+  mask.className = 'modal-mask';
+  mask.innerHTML =
+    '<div class="modal"><h3>引用了这张图的文章</h3>' +
+    '<p class="modal__tip">' + esc(name) + '</p>' +
+    '<div class="refs-list">' +
+    (refs && refs.length
+      ? refs
+          .map(function (p) {
+            return (
+              '<a class="refs-row" href="#/editor/' + encodeURIComponent(p.slug) + '">' +
+              '<span class="refs-row__title">' + esc(p.title || p.slug) +
+              (p.draft ? ' <span class="badge-draft">草稿</span>' : '') + '</span>' +
+              '<span class="refs-row__meta">' + (fmtDate(p.pubDate) || '') + ' · 编辑 →</span></a>'
+            );
+          })
+          .join('')
+      : '<p class="modal__tip">没有找到引用——列表可能已过期，刷新后再试。</p>') +
+    '</div>' +
+    '<div class="modal__actions"><button class="btn btn--ghost" data-act="close">关闭</button></div></div>';
+  document.body.appendChild(mask);
+  function close() {
+    document.removeEventListener('keydown', onKey);
+    mask.remove();
+  }
+  function onKey(e) {
+    if (e.key === 'Escape' && document.querySelectorAll('.modal-mask').length <= 1) close();
+  }
+  mask.addEventListener('click', function (e) {
+    // 点引用行：先关弹窗再让默认 hash 导航继续，否则弹窗盖在编辑器上
+    var row = e.target.closest && e.target.closest('.refs-row');
+    if (row) {
+      close();
+      return;
+    }
+    var act = e.target.getAttribute && e.target.getAttribute('data-act');
+    if (act === 'close' || e.target === mask) close();
   });
   document.addEventListener('keydown', onKey);
 }
