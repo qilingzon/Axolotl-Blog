@@ -1631,6 +1631,26 @@ a.stat:hover {
   white-space: nowrap;
 }
 
+/* ---------- 图片放大预览 ---------- */
+.lightbox-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+  padding: 20px;
+}
+
+.lightbox-mask img {
+  max-width: 92vw;
+  max-height: 92vh;
+  border-radius: var(--radius);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+}
+
 /* ---------- 标签总览 ---------- */
 .tags-view {
   display: flex;

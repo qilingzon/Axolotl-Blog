@@ -2270,7 +2270,10 @@ function renderMedia() {
           ? '<span class="spacer"></span><input class="search-input" id="media-search" placeholder="搜文件名…">' +
             '<select id="media-type" style="width:110px"><option value="">全部类型</option>' +
             '<option value="png">PNG</option><option value="jpg">JPG</option><option value="webp">WebP</option>' +
-            '<option value="gif">GIF</option><option value="avif">AVIF</option></select>'
+            '<option value="gif">GIF</option><option value="avif">AVIF</option></select>' +
+            '<select id="media-sort" style="width:120px"><option value="">默认排序</option>' +
+            '<option value="name-asc">名称 A→Z</option><option value="name-desc">名称 Z→A</option>' +
+            '<option value="size-desc">大小 大→小</option><option value="size-asc">大小 小→大</option></select>'
           : '') +
         '</div>' +
         '<div class="dropzone" id="dropzone">把图片拖到这里，或 <button class="btn btn--sm" id="pick-btn" type="button">选择文件</button>（也可以直接 Ctrl+V 粘贴截图）</div>' +
@@ -2280,26 +2283,43 @@ function renderMedia() {
       attachDims($('#media-list'));
       $('#media-list').addEventListener('click', function (e) {
         var badge = e.target.closest('button[data-showrefs]');
-        if (badge) openRefsModal(badge.dataset.showrefs, refsMap ? refsMap[badge.dataset.showrefs] : null);
+        if (badge) {
+          openRefsModal(badge.dataset.showrefs, refsMap ? refsMap[badge.dataset.showrefs] : null);
+          return;
+        }
+        // 点缩略图放大查看（Esc/点击任意处关闭）
+        var img = e.target.closest('.media-item img');
+        if (img) openLightbox(img.src);
       });
       var searchEl = $('#media-search');
       var typeEl = $('#media-type');
-      if (searchEl || typeEl) {
-        // 文件名 + 类型双条件叠加过滤
+      var sortEl = $('#media-sort');
+      if (searchEl || typeEl || sortEl) {
+        // 文件名 + 类型双条件叠加过滤，再按排序输出
         function applyFilter() {
           var kw = searchEl ? searchEl.value.trim().toLowerCase() : '';
           var type = typeEl ? typeEl.value : '';
+          var sort = sortEl ? sortEl.value : '';
           var hit = images.filter(function (im) {
             var hitKw = !kw || im.name.toLowerCase().indexOf(kw) !== -1;
             var ext = String(im.name.split('.').pop() || '').toLowerCase();
             var hitType = !type || ext === type || (type === 'jpg' && ext === 'jpeg');
             return hitKw && hitType;
           });
+          if (sort) {
+            var dir = sort.split('-')[1] === 'desc' ? -1 : 1;
+            var key = sort.split('-')[0];
+            hit = hit.slice().sort(function (a, b) {
+              if (key === 'size') return (a.size - b.size) * dir;
+              return String(a.name).localeCompare(String(b.name), 'zh-CN') * dir;
+            });
+          }
           $('#media-list').innerHTML = gridHtml(hit);
           attachDims($('#media-list'));
         }
         if (searchEl) searchEl.addEventListener('input', applyFilter);
         if (typeEl) typeEl.addEventListener('change', applyFilter);
+        if (sortEl) sortEl.addEventListener('change', applyFilter);
       }
       bindMedia();
     })
@@ -2484,6 +2504,23 @@ function openRefsModal(name, refs) {
     var act = e.target.getAttribute && e.target.getAttribute('data-act');
     if (act === 'close' || e.target === mask) close();
   });
+  document.addEventListener('keydown', onKey);
+}
+
+/** 图片放大查看：全屏遮罩，点击任意处或 Esc 关闭 */
+function openLightbox(src) {
+  var mask = document.createElement('div');
+  mask.className = 'lightbox-mask';
+  mask.innerHTML = '<img src="' + esc(src) + '" alt="放大预览">';
+  document.body.appendChild(mask);
+  function close() {
+    document.removeEventListener('keydown', onKey);
+    mask.remove();
+  }
+  function onKey(e) {
+    if (e.key === 'Escape' && document.querySelectorAll('.lightbox-mask').length <= 1) close();
+  }
+  mask.addEventListener('click', close);
   document.addEventListener('keydown', onKey);
 }
 
