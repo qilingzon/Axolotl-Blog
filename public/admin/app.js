@@ -2048,7 +2048,10 @@ function renderMedia() {
         '<div class="page-head"><h1>媒体库</h1><span style="color:var(--text-muted);font-size:14px">' +
         images.length + ' 张图片 · 上传自动压缩</span>' +
         (images.length > 3
-          ? '<span class="spacer"></span><input class="search-input" id="media-search" placeholder="搜文件名…">'
+          ? '<span class="spacer"></span><input class="search-input" id="media-search" placeholder="搜文件名…">' +
+            '<select id="media-type" style="width:110px"><option value="">全部类型</option>' +
+            '<option value="png">PNG</option><option value="jpg">JPG</option><option value="webp">WebP</option>' +
+            '<option value="gif">GIF</option><option value="avif">AVIF</option></select>'
           : '') +
         '</div>' +
         '<div class="dropzone" id="dropzone">把图片拖到这里，或 <button class="btn btn--sm" id="pick-btn" type="button">选择文件</button>（也可以直接 Ctrl+V 粘贴截图）</div>' +
@@ -2057,17 +2060,23 @@ function renderMedia() {
       renderShell('media', html);
       attachDims($('#media-list'));
       var searchEl = $('#media-search');
-      if (searchEl) {
-        searchEl.addEventListener('input', function () {
-          var kw = this.value.trim().toLowerCase();
-          var hit = !kw
-            ? images
-            : images.filter(function (im) {
-                return im.name.toLowerCase().indexOf(kw) !== -1;
-              });
+      var typeEl = $('#media-type');
+      if (searchEl || typeEl) {
+        // 文件名 + 类型双条件叠加过滤
+        function applyFilter() {
+          var kw = searchEl ? searchEl.value.trim().toLowerCase() : '';
+          var type = typeEl ? typeEl.value : '';
+          var hit = images.filter(function (im) {
+            var hitKw = !kw || im.name.toLowerCase().indexOf(kw) !== -1;
+            var ext = String(im.name.split('.').pop() || '').toLowerCase();
+            var hitType = !type || ext === type || (type === 'jpg' && ext === 'jpeg');
+            return hitKw && hitType;
+          });
           $('#media-list').innerHTML = gridHtml(hit);
           attachDims($('#media-list'));
-        });
+        }
+        if (searchEl) searchEl.addEventListener('input', applyFilter);
+        if (typeEl) typeEl.addEventListener('change', applyFilter);
       }
       bindMedia();
     })
