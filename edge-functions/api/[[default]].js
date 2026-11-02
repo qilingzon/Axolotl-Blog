@@ -325,10 +325,12 @@ function parseScalar(raw) {
 }
 
 function stripQuotes(s) {
-  if (
-    (s.startsWith("'") && s.endsWith("'") && s.length >= 2) ||
-    (s.startsWith('"') && s.endsWith('"') && s.length >= 2)
-  ) {
+  // YAML 单引号转义：'' 代表一个 '（quoteYaml 写入的口径）——解析时必须还原，
+  // 否则标题带 ' 的文章每经一次保存引号就翻倍
+  if (s.startsWith("'") && s.endsWith("'") && s.length >= 2) {
+    return s.slice(1, -1).replaceAll("''", "'");
+  }
+  if (s.startsWith('"') && s.endsWith('"') && s.length >= 2) {
     return s.slice(1, -1);
   }
   return s;
@@ -368,11 +370,17 @@ function serializeFrontmatter(meta, body) {
 
 const ACCENTS = ['pink', 'purple', 'wild', 'cyan', 'gold', 'blue', 'green'];
 
+/** 日期防线：非法日期一律落回当前时间——坏字符串进了 frontmatter 会让 Astro(zod) 构建全站失败 */
+function normalizeDate(v) {
+  const d = v ? new Date(v) : new Date();
+  return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
+
 function normalizeMeta(raw) {
   return {
     title: String(raw.title || '').slice(0, 120),
     description: String(raw.description || '').slice(0, 300),
-    pubDate: raw.pubDate || new Date().toISOString(),
+    pubDate: normalizeDate(raw.pubDate),
     tags: (Array.isArray(raw.tags) ? raw.tags : [])
       .map((t) => String(t).trim())
       .filter(Boolean)
@@ -472,7 +480,9 @@ async function handlePostItem(method, slug, request) {
       },
     });
 
-    // slug 变更时删除旧文件
+    // slug 变更时删除旧文件。删除失败不能让整个保存失败（新文件已落库）：
+    // 否则用户重试会撞上自己刚建的新文件被 409 拒——把警告带回前端才是活路
+    let warn = '';
     if (oldSlug && oldSlug !== slug && SLUG_RE.test(oldSlug)) {
       const oldPath = `${POSTS_DIR}/${oldSlug}.md`;
       const old = await ghFetch(repoSegments('contents', oldPath)).catch(() => null);
@@ -484,10 +494,12 @@ async function handlePostItem(method, slug, request) {
             sha: old.sha,
             branch: CFG.branch(),
           },
+        }).catch((e) => {
+          warn = `新文章已保存，但旧文件 ${oldSlug}.md 删除失败：${(e && e.message) || '未知错误'}。请稍后到文章列表手动删除旧篇，否则会出现重名文章。`;
         });
       }
     }
-    return json({ ok: true, slug, created: isNew });
+    return json({ ok: true, slug, created: isNew, ...(warn ? { warn } : {}) });
   }
 
   if (method === 'DELETE') {
@@ -645,3 +657,6 @@ async function handleDeleteMedia(url) {
   });
   return json({ ok: true });
 }
+
+// ---------- 仅供测试的纯函数导出（EdgeOne 只认 onRequest，多出的具名导出无副作用） ----------
+export { parseFrontmatter, serializeFrontmatter, normalizeMeta, normalizeDate, parseScalar };

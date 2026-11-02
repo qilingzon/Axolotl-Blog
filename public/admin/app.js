@@ -1918,11 +1918,15 @@ function bindEditor(origSlug, post) {
         body: currentBody(),
       },
     })
-      .then(function () {
+      .then(function (data) {
         editorGuard = null; // 保存成功后的跳转不拦截
         lastSavedAt = Date.now();
         localStorage.removeItem('cms-autodraft');
-        toast('已保存，站点构建约需一分钟');
+        if (data && data.warn) {
+          toast(data.warn, true); // 改名的旧文件删除失败：新文章已保存，提醒手动清理
+        } else {
+          toast('已保存，站点构建约需一分钟');
+        }
         location.hash = '#/posts';
       })
       .catch(function (err) {
