@@ -605,6 +605,34 @@ function renderPosts(mode) {
         listEl.innerHTML = slice.length
           ? slice.map(postRowHtml).join('')
           : '<div class="empty-tip"><img src="/assets/axolotl-wild.png" alt=""><br>没有匹配的文章</div>';
+        // 搜索命中高亮：TreeWalker 只包文本节点里的匹配段，不碰已转义的 HTML 结构
+        if (kw) {
+          listEl.querySelectorAll('.post-row__title').forEach(function (el) {
+            var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+            var nodes = [];
+            while (walker.nextNode()) nodes.push(walker.currentNode);
+            nodes.forEach(function (node) {
+              var text = node.textContent;
+              if (text.toLowerCase().indexOf(kw) === -1) return;
+              var frag = document.createDocumentFragment();
+              var pos = 0;
+              for (;;) {
+                var hit = text.toLowerCase().indexOf(kw, pos);
+                if (hit === -1) {
+                  frag.appendChild(document.createTextNode(text.slice(pos)));
+                  break;
+                }
+                frag.appendChild(document.createTextNode(text.slice(pos, hit)));
+                var mark = document.createElement('mark');
+                mark.className = 'search-hit';
+                mark.textContent = text.slice(hit, hit + kw.length);
+                frag.appendChild(mark);
+                pos = hit + kw.length;
+              }
+              node.parentNode.replaceChild(frag, node);
+            });
+          });
+        }
       }
       function goPage(target) {
         page = target;

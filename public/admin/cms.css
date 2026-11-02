@@ -1607,3 +1607,11 @@ a.stat:hover {
   padding: 1px 7px;
   color: var(--text-muted);
 }
+
+/* ---------- 搜索命中高亮 ---------- */
+.search-hit {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 3px;
+  padding: 0 3px;
+}
