@@ -174,7 +174,7 @@ function openHistoryModal(slug, onRolledBack) {
       .then(function (p) {
         body.innerHTML =
           '<p class="modal__tip">' + esc(fmtDate(v.date)) + ' · ' + esc(v.message || '') +
-          '（标题：' + esc(p.title || '未命名') + '）</p>' +
+          '（标题：' + esc(p.title || '未命名') + ' · 正文 ' + String(p.body || '').replace(/\s/g, '').length + ' 字）</p>' +
           '<div class="hist-preview md-body">' +
           (renderMarkdown(p.body || '') || '<p>（这一版正文是空的）</p>') +
           '</div>';
@@ -555,6 +555,8 @@ function statCard(num, label, img, href, tip) {
 
 function postRowHtml(p, kw) {
   var img = (ACCENTS.find(function (a) { return a.id === p.accent; }) || ACCENTS[0]).img;
+  // 正文图片数：有图才显示徽标，写文章时一眼看哪篇配了图（与编辑器字数区口径一致）
+  var imgCount = (String(p.body || '').match(/!\[[^\]]*\]\([^)]+\)/g) || []).length;
   // 搜索命中在正文（标题没命中）时给一行上下文片段，命中段包 mark；不传 kw 则无此行
   var snippet = '';
   if (kw && String(p.title || '').toLowerCase().indexOf(kw) === -1) {
@@ -577,7 +579,8 @@ function postRowHtml(p, kw) {
     '<div class="post-row__main"><div class="post-row__title">' + esc(p.title) +
     (p.draft ? ' <span class="badge-draft">草稿</span>' : '') + '</div>' +
     '<div class="post-row__meta"><span>' + fmtDate(p.pubDate) + '</span>' +
-    '<span>' + (p.tags || []).map(function (t) { return '<span class="tag-chip">' + esc(t) + '</span>'; }).join(' ') + '</span></div>' +
+    '<span>' + (p.tags || []).map(function (t) { return '<span class="tag-chip">' + esc(t) + '</span>'; }).join(' ') +
+    (imgCount ? '<span class="tag-chip tag-chip--imgs" title="正文里有 ' + imgCount + ' 张图">' + imgCount + ' 图</span>' : '') + '</span></div>' +
     snippet + '</div>' +
     // 草稿前台 404，「链」指向只有自己知道链接的预览页；已发布才给 /blog/ 链接
     '<span class="row-link-btn" data-copylink="' + (p.draft ? '/preview/' : '/blog/') + encodeURIComponent(p.slug) + '/" title="' + (p.draft ? '复制预览页链接（草稿没有前台页）' : '复制前台文章链接') + '">链</span>' +

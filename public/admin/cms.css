@@ -478,6 +478,11 @@ a.stat:hover {
   line-height: 20px;
 }
 
+/* 文章行的「N 图」徽标：灰调区别于彩色标签 chip */
+.tag-chip--imgs {
+  color: var(--text-muted);
+}
+
 .badge-draft {
   color: #b9831b;
   background: #fdf3d7;
