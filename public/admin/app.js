@@ -264,12 +264,19 @@ function api(method, endpoint, opts) {
   if (opts.query) url += '?' + new URLSearchParams(opts.query).toString();
   var headers = { 'Content-Type': 'application/json' };
   if (state.token) headers.Authorization = 'Bearer ' + state.token;
+  // 45s 超时兜底：网络卡死时按钮不至于永远转圈；慢网上传（≤980KB）也远够用
+  var ctrl = new AbortController();
+  var timer = setTimeout(function () {
+    ctrl.abort();
+  }, 45000);
   return fetch(url, {
     method: method,
     headers: headers,
     body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    signal: ctrl.signal,
   })
     .then(function (res) {
+      clearTimeout(timer);
       return res.json().catch(function () {
         return {};
       }).then(function (data) {
@@ -280,6 +287,11 @@ function api(method, endpoint, opts) {
         if (!res.ok) throw new Error(data.error || '请求失败（' + res.status + '）');
         return data;
       });
+    })
+    .catch(function (err) {
+      clearTimeout(timer);
+      if (err && err.name === 'AbortError') throw new Error('请求超时了，检查网络后重试');
+      throw err;
     });
 }
 
@@ -608,6 +620,7 @@ function renderPosts(mode) {
         '<input class="search-input" id="post-search" placeholder="搜标题、标签或正文…">' +
         '<select id="post-tag" style="width:130px"><option value="">全部标签</option>' +
         allTags.map(function (t) { return '<option>' + esc(t) + '</option>'; }).join('') +
+        (allTags.length ? '<option value="__none__">（未打标签）</option>' : '') +
         '</select>' +
         '<select id="post-sort" style="width:130px" title="排序方式"><option value="">按日期（新→旧）</option>' +
         '<option value="title-asc">标题 A→Z</option><option value="title-desc">标题 Z→A</option></select>' +
@@ -634,7 +647,7 @@ function renderPosts(mode) {
             (p.tags || []).some(function (t) {
               return t.toLowerCase().includes(kw);
             });
-          var hitTag = !tag || (p.tags || []).includes(tag);
+          var hitTag = tag === '__none__' ? !(p.tags || []).length : !tag || (p.tags || []).includes(tag);
           var hitDraft = !draftOnly || p.draft;
           return hitKw && hitTag && hitDraft;
         });
