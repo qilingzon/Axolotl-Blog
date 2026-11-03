@@ -365,6 +365,13 @@ a.stat:hover {
   margin-bottom: 22px;
 }
 
+/* 登录页免登说明小字 */
+.login__hint {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin: 12px 0 0;
+}
+
 .field {
   text-align: left;
   margin-bottom: 14px;

@@ -453,6 +453,7 @@ function renderLogin() {
     '<div class="field"><label>密码</label><input name="password" type="password" autocomplete="current-password" required></div>' +
     '<p class="form-error" id="login-error"></p>' +
     '<button class="btn" type="submit" style="width:100%">进入池塘</button>' +
+    '<p class="login__hint">登录后 12 小时内免重新进入，一直用会自动续期</p>' +
     '</form></div></div>';
   $('#login-form').addEventListener('submit', function (e) {
     e.preventDefault();
@@ -537,7 +538,7 @@ function renderDashboard() {
         if (commits === null) {
           actHtml = '<div class="empty-tip">暂时取不到动态，不影响使用</div>';
         } else if (!commits.length) {
-          actHtml = '<div class="empty-tip">还没有任何保存记录</div>';
+          actHtml = '<div class="empty-tip">还没有任何保存记录</div>' + (repoUrl ? '<a class="act-more" href="' + esc(repoUrl) + '" target="_blank" rel="noopener">在 GitHub 看全部历史 →</a>' : '');
         } else {
           actHtml = commits
             .map(function (c) {
