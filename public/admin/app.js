@@ -1735,6 +1735,7 @@ function createBlockEditor(deps) {
   // ---------- 对外接口 ----------
 
   return {
+    pickImage: pickImage, // 进阶模式工具栏也用同一个媒体库选图器
     load: function (markdown) {
       blocks = parseBlocks(markdown);
       renderAll();
@@ -1822,6 +1823,7 @@ function renderEditor(slug) {
         mdBtn('加粗', '把选中的文字加粗', '**', '**') + mdBtn('斜体', '把选中的文字变斜体', '*', '*') +
         mdBtn('链接', '给选中文字加个网址', '[', '](https://)') +
         mdBtn('图片', '插入一张图片', '![', '](/assets/uploads/)') +
+        '<button type="button" class="ed-topbar__btn" id="pro-pick-btn" title="从媒体库选一张，插到光标处（也能顺手上传新图）">选图</button>' +
         mdBtn('引用', '引用块', '> ', '') + mdBtn('代码', '代码块', '\n```\n', '\n```\n') +
         mdBtn('表格', '表格', '\n| 列1 | 列2 |\n| --- | --- |\n| ', ' | |\n') +
         '<span class="md-toolbar__hint">小白须知：先选中文字再点按钮 · 写错了点 ↩ 回退</span>' +
@@ -1992,6 +1994,20 @@ function bindEditor(origSlug, post) {
     ta.setRangeText(before + after, ta.selectionStart, ta.selectionEnd, 'select');
     ta.focus();
     pushHist();
+  });
+
+  // 进阶模式「选图」：同一个媒体库选图器（小白模式也用它），选完插到光标处
+  $('#pro-pick-btn').addEventListener('click', function () {
+    blk.pickImage(function (url) {
+      var start = ta.selectionStart;
+      var text = '![](' + url + ')';
+      ta.setRangeText(text, start, ta.selectionEnd, 'select');
+      ta.focus();
+      dirty = true;
+      queueHist();
+      refreshPreview();
+      updateWordCount();
+    });
   });
 
   $('#pv-theme-btn').addEventListener('click', function () {
