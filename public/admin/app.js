@@ -587,6 +587,8 @@ function renderPosts(mode) {
         '<select id="post-tag" style="width:130px"><option value="">全部标签</option>' +
         allTags.map(function (t) { return '<option>' + esc(t) + '</option>'; }).join('') +
         '</select>' +
+        '<select id="post-sort" style="width:130px" title="排序方式"><option value="">按日期（新→旧）</option>' +
+        '<option value="title-asc">标题 A→Z</option><option value="title-desc">标题 Z→A</option></select>' +
         '<label class="draft-filter" title="只显示存为草稿的文章"><input type="checkbox" id="post-draft" ' + (mode === 'draft' ? 'checked' : '') + '>只看草稿</label>' +
         '<a class="btn" href="#/editor/new">写新文章</a></div>' +
         '<div id="post-list">' + posts.map(postRowHtml).join('') + '</div>' +
@@ -614,6 +616,14 @@ function renderPosts(mode) {
           var hitDraft = !draftOnly || p.draft;
           return hitKw && hitTag && hitDraft;
         });
+        // 排序：默认维持服务端顺序（日期新→旧），选标题排序时 zh-CN 本地化比较
+        var sort = $('#post-sort') ? $('#post-sort').value : '';
+        if (sort) {
+          var dir = sort.split('-')[1] === 'desc' ? -1 : 1;
+          filtered = filtered.slice().sort(function (a, b) {
+            return String(a.title).localeCompare(String(b.title), 'zh-CN') * dir;
+          });
+        }
         var totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
         if (page > totalPages) page = totalPages;
         // 单页不渲染分页控件：小数据量下界面与从前一字不差（负优化禁令）
@@ -680,6 +690,9 @@ function renderPosts(mode) {
         refresh(true);
       });
       $('#post-draft').addEventListener('change', function () {
+        refresh(true);
+      });
+      $('#post-sort').addEventListener('change', function () {
         refresh(true);
       });
       pagerEl.addEventListener('click', function (e) {
@@ -2154,6 +2167,15 @@ function bindEditor(origSlug, post) {
       }
     });
   }
+
+  // Ctrl/Cmd+S 保存：绑在编辑器卡片上（冒泡覆盖小白/进阶/字段所有输入处），
+  // 焦点在卡内任意输入处都能直接保存，不用鼠标去找按钮
+  $('#editor-card').addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+      e.preventDefault();
+      $('#save-btn').click();
+    }
+  });
 
   $('#save-btn').addEventListener('click', function () {
     var slug = $('#f-slug').value.trim();
