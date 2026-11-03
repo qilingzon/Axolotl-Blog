@@ -579,7 +579,9 @@ async function handleActivity() {
   const commits = await ghFetch(repoSegments('commits'), {
     query: { per_page: '5', sha: CFG.branch() },
   });
-  return json({ commits: (Array.isArray(commits) ? commits : []).map(trimCommit) });
+  // repoUrl 供前端给「在 GitHub 看全部」外链：仓库配置只从服务端出，前端不硬编码
+  const repoUrl = 'https://github.com/' + CFG.repo() + '/commits/' + encodeURIComponent(CFG.branch());
+  return json({ commits: (Array.isArray(commits) ? commits : []).map(trimCommit), repoUrl });
 }
 
 /** GET /api/history/{slug}：这篇文章最近 15 次提交（裁剪字段，不透传 GitHub 原始对象） */

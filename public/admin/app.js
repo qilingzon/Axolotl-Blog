@@ -451,7 +451,7 @@ function renderDashboard() {
   // 最近动态是锦上添花：拿不到（网络/权限抖动）就降级成一句话，不影响仪表盘主体
   var activity = api('GET', 'activity')
     .then(function (d) {
-      return d.commits || [];
+      return { commits: d.commits || [], repoUrl: d.repoUrl || '' };
     })
     .catch(function () {
       return null;
@@ -485,7 +485,9 @@ function renderDashboard() {
         ? '<a class="resume-edit" href="#/editor/' + encodeURIComponent(lastPost.slug) + '" title="接着上次写到一半的文章">' +
           '✏️ 继续上次：《' + esc(lastPost.title || lastPost.slug) + '》</a>'
         : '';
-      return activity.then(function (commits) {
+      return activity.then(function (act) {
+        var commits = act ? act.commits : null;
+        var repoUrl = act ? act.repoUrl : '';
         var actHtml;
         if (commits === null) {
           actHtml = '<div class="empty-tip">暂时取不到动态，不影响使用</div>';
@@ -511,6 +513,11 @@ function renderDashboard() {
                 : '<div class="act-row">' + inner + '</div>';
             })
             .join('');
+          // 服务端带来的仓库地址存在时才给「看全部」外链（新域名随配置走，前端不硬编码）
+          if (repoUrl) {
+            actHtml +=
+              '<a class="act-more" href="' + esc(repoUrl) + '" target="_blank" rel="noopener">在 GitHub 看全部历史 →</a>';
+          }
         }
         var html =
           '<div class="page-head"><h1>仪表盘</h1><span class="spacer"></span>' +
@@ -3041,6 +3048,18 @@ function uploadFiles(files) {
 
 app = $('#app');
 bindMediaDelegates();
+// 快捷键 N：未聚焦输入框、无弹窗时按 N 直接写新文章（登录后生效）
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'n' && e.key !== 'N') return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!loggedIn() || location.hash === '#/editor/new') return;
+  var t = e.target;
+  var tag = t && t.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
+  if (document.querySelector('.modal-mask, .lightbox-mask')) return;
+  e.preventDefault();
+  location.hash = '#/editor/new';
+});
 if (loggedIn()) {
   // 校验 token 的同时刷新用户名（token 里才有真实身份，localStorage 可能是旧值）；
   // 后端滑续期换发了新令牌就接住，活跃用户不再被 12h 时效半路踢下线

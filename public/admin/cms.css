@@ -1639,6 +1639,19 @@ a.act-row--link:hover .act-row__sha {
   color: var(--accent);
 }
 
+/* 动态区尾部的 GitHub 全部历史外链 */
+.act-more {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.act-more:hover {
+  color: var(--accent);
+}
+
 /* ---------- 文章列表分页（仅多页时渲染） ---------- */
 .pager {
   display: flex;
