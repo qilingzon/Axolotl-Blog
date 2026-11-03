@@ -129,6 +129,21 @@ t('serializeFrontmatter 正文原样保留（不二次加工）', () => {
   assert.ok(text.endsWith('\n```\n'));
 });
 
+// ---------- 2026-11-04 补强：边界回归网 ----------
+
+t('normalizeDate 布尔/对象等垃圾类型落回当前时间', () => {
+  assert.ok(!isNaN(new Date(normalizeDate(false)).getTime()));
+  assert.ok(!isNaN(new Date(normalizeDate({})).getTime()));
+});
+
+t('parseScalar 数字字符串保持字符串（仅布尔/列表特判）', () => {
+  assert.equal(parseScalar('42'), '42');
+});
+
+t('parseScalar 列表字符串', () => {
+  assert.deepEqual(parseScalar('[a, b]'), ['a', 'b']);
+});
+
 console.log('');
 console.log(`RESULT pass=${pass} fail=${fail}`);
 process.exit(fail ? 1 : 0);
