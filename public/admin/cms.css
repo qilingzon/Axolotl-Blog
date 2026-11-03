@@ -1055,6 +1055,13 @@ a.stat:hover {
   font-size: 13px;
   color: var(--text-muted);
   white-space: nowrap;
+  cursor: pointer;
+}
+
+/* 写作小目标达标：字数区点亮主题色 */
+.word-count--done {
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .ed-topbar__btn {

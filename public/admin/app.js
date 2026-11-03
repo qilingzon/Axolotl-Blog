@@ -247,6 +247,7 @@ var ENDPOINTS = {
 
 /** slug 白名单：与后端一致（ASCII 字母数字开头，仅 ._-） */
 var SLUG_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,80}$/;
+var WORD_GOAL_KEY = 'cms-word-goal'; // 写作小目标：目标字数存 localStorage，跨会话记住
 
 function api(method, endpoint, opts) {
   opts = opts || {};
@@ -1753,7 +1754,7 @@ function renderEditor(slug) {
         '</div>' +
         '<button type="button" class="ed-topbar__btn" id="hist-undo-btn" title="回退上一步（Ctrl+Z）" disabled>↩ 回退</button>' +
         '<button type="button" class="ed-topbar__btn" id="hist-redo-btn" title="恢复（Ctrl+Y）" disabled>↪ 恢复</button>' +
-        '<span class="word-count" id="word-count"></span>' +
+        '<span class="word-count" id="word-count" title="点这里设个小目标字数"></span>' +
         (isNew ? '' : '<button type="button" class="ed-topbar__btn" id="hist-btn" title="这篇文章的修改历史，可以回到任意一版">历史</button>') +
         '<span class="spacer"></span>' +
         '<button type="button" class="ed-topbar__btn" id="focus-btn" title="收起上面的文章信息，专心写正文">专注</button>' +
@@ -1927,6 +1928,7 @@ function bindEditor(origSlug, post) {
   ta.addEventListener('input', function () {
     queueHist();
     refreshPreview();
+    updateWordCount();
   });
   refreshPreview();
 
@@ -1987,9 +1989,17 @@ function bindEditor(origSlug, post) {
   function updateWordCount() {
     var n = easyMode ? blk.countChars() : ta.value.replace(/\s/g, '').length;
     // 阅读时长按中文 400 字/分钟估算，至少 1 分钟
-    $('#word-count').textContent = n
-      ? '约 ' + n + ' 字 · 大概 ' + Math.max(1, Math.round(n / 400)) + ' 分钟读完'
-      : '';
+    var text = n ? '约 ' + n + ' 字' : '';
+    // 可选小目标：localStorage 存目标字数，写够显示进度与达标彩蛋；没设时展示与从前完全一致
+    var goal = parseInt(localStorage.getItem(WORD_GOAL_KEY), 10);
+    var done = false;
+    if (text && goal > 0) {
+      done = n >= goal;
+      text += ' · 目标 ' + goal + '（' + Math.min(100, Math.round((n / goal) * 100)) + '%）' + (done ? ' 🎉 达标！' : '');
+    }
+    $('#word-count').classList.toggle('word-count--done', done);
+    if (text) text += ' · 大概 ' + Math.max(1, Math.round(n / 400)) + ' 分钟读完';
+    $('#word-count').textContent = text;
   }
 
   function applyMode() {
@@ -2003,6 +2013,15 @@ function bindEditor(origSlug, post) {
     updateWordCount();
   }
   applyMode();
+
+  // 点字数区设/改写作小目标（弹窗里清空即取消）
+  $('#word-count').addEventListener('click', function () {
+    openWordGoalModal(function (goal) {
+      if (goal > 0) localStorage.setItem(WORD_GOAL_KEY, String(goal));
+      else localStorage.removeItem(WORD_GOAL_KEY);
+      updateWordCount();
+    });
+  });
 
   $('#mode-seg').addEventListener('click', function (e) {
     var btn = e.target.closest('button[data-mode]');
@@ -2208,6 +2227,8 @@ function renderMedia() {
     })
     .then(function (both) {
       var images = both.data.images || [];
+      var MEDIA_PAGE_SIZE = 24; // 每页张数；不足一页时分页控件完全不渲染（负优化禁令）
+      var mPage = 1;
       var list = both.list;
       // name → 引用它的文章数组（含草稿）；计数与「查看引用」弹窗共用
       var refsMap = null;
@@ -2278,7 +2299,8 @@ function renderMedia() {
         '</div>' +
         '<div class="dropzone" id="dropzone">把图片拖到这里，或 <button class="btn btn--sm" id="pick-btn" type="button">选择文件</button>（也可以直接 Ctrl+V 粘贴截图）</div>' +
         '<input type="file" id="file-input" accept="image/*" multiple hidden>' +
-        '<div id="media-list">' + gridHtml(images) + '</div>';
+        '<div id="media-list">' + gridHtml(images) + '</div>' +
+        (images.length > MEDIA_PAGE_SIZE ? '<div id="media-pager"></div>' : '');
       renderShell('media', html);
       attachDims($('#media-list'));
       $('#media-list').addEventListener('click', function (e) {
@@ -2299,8 +2321,9 @@ function renderMedia() {
       var typeEl = $('#media-type');
       var sortEl = $('#media-sort');
       if (searchEl || typeEl || sortEl) {
-        // 文件名 + 类型双条件叠加过滤，再按排序输出
-        function applyFilter() {
+        // 文件名 + 类型双条件叠加过滤，再按排序输出；reset=true 时回到第 1 页
+        function applyFilter(reset) {
+          if (reset) mPage = 1;
           var kw = searchEl ? searchEl.value.trim().toLowerCase() : '';
           var type = typeEl ? typeEl.value : '';
           var sort = sortEl ? sortEl.value : '';
@@ -2318,12 +2341,48 @@ function renderMedia() {
               return String(a.name).localeCompare(String(b.name), 'zh-CN') * dir;
             });
           }
-          $('#media-list').innerHTML = gridHtml(hit);
+          // 分页：与文章列表同一套 pager 样式；单页时清空，界面与从前一字不差
+          var total = Math.max(1, Math.ceil(hit.length / MEDIA_PAGE_SIZE));
+          if (mPage > total) mPage = total;
+          var pager = $('#media-pager');
+          if (pager) {
+            if (total > 1) {
+              var btns = '';
+              for (var i = 1; i <= total; i++) {
+                btns +=
+                  '<button type="button" class="pager__num' + (i === mPage ? ' active' : '') +
+                  '" data-page="' + i + '">' + i + '</button>';
+              }
+              pager.innerHTML =
+                '<div class="pager">' +
+                '<button type="button" class="pager__num" data-page="' + (mPage - 1) + '"' +
+                (mPage <= 1 ? ' disabled' : '') + '>‹</button>' +
+                btns +
+                '<button type="button" class="pager__num" data-page="' + (mPage + 1) + '"' +
+                (mPage >= total ? ' disabled' : '') + '>›</button>' +
+                '<span class="pager__info">第 ' + mPage + ' / ' + total + ' 页 · 共 ' + hit.length + ' 张</span>' +
+                '</div>';
+            } else {
+              pager.innerHTML = '';
+            }
+          }
+          var slice = hit.slice((mPage - 1) * MEDIA_PAGE_SIZE, mPage * MEDIA_PAGE_SIZE);
+          $('#media-list').innerHTML = gridHtml(slice);
           attachDims($('#media-list'));
         }
-        if (searchEl) searchEl.addEventListener('input', applyFilter);
-        if (typeEl) typeEl.addEventListener('change', applyFilter);
-        if (sortEl) sortEl.addEventListener('change', applyFilter);
+        if (searchEl) searchEl.addEventListener('input', function () { applyFilter(true); });
+        if (typeEl) typeEl.addEventListener('change', function () { applyFilter(true); });
+        if (sortEl) sortEl.addEventListener('change', function () { applyFilter(true); });
+        var mediaPager = $('#media-pager');
+        if (mediaPager) {
+          mediaPager.addEventListener('click', function (e) {
+            var btn = e.target.closest('button[data-page]');
+            if (!btn || btn.disabled) return;
+            mPage = parseInt(btn.dataset.page, 10);
+            applyFilter(false);
+          });
+        }
+        if (images.length > MEDIA_PAGE_SIZE) applyFilter(true);
       }
       bindMedia();
     })
@@ -2464,6 +2523,47 @@ function renameImageFlow(name) {
           btn.disabled = false;
         });
     }
+  });
+  document.addEventListener('keydown', onKey);
+}
+
+/** 写作小目标：设一个目标字数，顶栏字数处显示进度；留空提交即取消 */
+function openWordGoalModal(onSet) {
+  var current = parseInt(localStorage.getItem(WORD_GOAL_KEY), 10) || '';
+  var mask = document.createElement('div');
+  mask.className = 'modal-mask';
+  mask.innerHTML =
+    '<div class="modal"><h3>写作小目标</h3>' +
+    '<p class="modal__tip">定个目标字数，顶栏会显示进度，写够时美西螈为你庆祝。留空则取消目标。</p>' +
+    '<div class="field"><input id="word-goal-input" type="number" min="1" step="100" value="' + (current || '') + '" placeholder="比如 2000" autocomplete="off"></div>' +
+    '<div class="modal__actions">' +
+    '<button class="btn btn--ghost" data-act="no">取消</button>' +
+    '<button class="btn" data-act="yes">定好了</button>' +
+    '</div></div>';
+  document.body.appendChild(mask);
+  var input = mask.querySelector('#word-goal-input');
+  input.focus();
+  input.select();
+  function close() {
+    document.removeEventListener('keydown', onKey);
+    mask.remove();
+  }
+  function onKey(e) {
+    if (e.key === 'Escape' && document.querySelectorAll('.modal-mask').length <= 1) close();
+  }
+  function submit() {
+    var v = parseInt(input.value, 10);
+    onSet(v > 0 ? v : 0);
+    close();
+  }
+  mask.addEventListener('click', function (e) {
+    var act = e.target.getAttribute && e.target.getAttribute('data-act');
+    if (act === 'no') close();
+    else if (e.target === mask) close();
+    else if (act === 'yes') submit();
+  });
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') submit();
   });
   document.addEventListener('keydown', onKey);
 }
