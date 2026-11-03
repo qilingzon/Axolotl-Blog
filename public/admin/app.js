@@ -249,6 +249,7 @@ var ENDPOINTS = {
 var SLUG_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,80}$/;
 var WORD_GOAL_KEY = 'cms-word-goal'; // 写作小目标：目标字数存 localStorage，跨会话记住
 var LAST_EDIT_KEY = 'cms-last-edit'; // 继续上次编辑：最近保存的文章 {slug, title, at}，仪表盘给个直达入口
+var freshUploads = []; // 本轮刚上传成功的图片名：媒体库渲染时高亮几秒，批量上传后一眼看到新图
 
 function api(method, endpoint, opts) {
   opts = opts || {};
@@ -2358,7 +2359,7 @@ function renderMedia() {
               list
                 .map(function (im) {
                   return (
-                    '<div class="media-item"><label class="media-item__pick" title="勾选批量删除"><input type="checkbox" data-pick="' + esc(im.name) + '"><span class="media-item__pickbox"></span></label>' +
+                    '<div class="media-item' + (freshUploads.indexOf(im.name) !== -1 ? ' media-item--fresh' : '') + '"><label class="media-item__pick" title="勾选批量删除"><input type="checkbox" data-pick="' + esc(im.name) + '"><span class="media-item__pickbox"></span></label>' +
                     '<img src="' + esc(im.url) + '" alt="" loading="lazy">' +
                     '<div class="media-item__bar"><span class="media-item__name" title="' + esc(im.name) + '">' +
                     highlightName(im.name, kw) + '（' + fmtSize(im.size) + '）</span>' +
@@ -2418,6 +2419,15 @@ function renderMedia() {
           : '');
       renderShell('media', html);
       attachDims($('#media-list'));
+      // 新图高亮只亮几秒：到点摘 class 并清空名单，重进媒体库不再高亮
+      if (freshUploads.length) {
+        setTimeout(function () {
+          freshUploads.length = 0;
+          document.querySelectorAll('.media-item--fresh').forEach(function (el) {
+            el.classList.remove('media-item--fresh');
+          });
+        }, 3000);
+      }
       $('#media-list').addEventListener('click', function (e) {
         var badge = e.target.closest('button[data-showrefs]');
         if (badge) {
@@ -2949,6 +2959,7 @@ function uploadImageFile(file) {
   return compressImage(file)
     .then(function (img) {
       return api('POST', 'media', { body: img }).then(function (res) {
+        freshUploads.push(img.name);
         return { name: img.name, url: '/assets/uploads/' + img.name, overwritten: !!(res && res.overwritten) };
       });
     });
