@@ -86,3 +86,4 @@
 - **媒体库批量管理（2026-11-04 本地攒批）**：>3 张出「批量管理」→ 勾选浮层 + :has 描边 + 底部「已选 N 张」操作条；确认弹窗列名；串行 DELETE，失败降级 toast「已删 X 张，Y 张失败（名单）」。E2E：隐藏零变化/勾选计数/取消清空/3 连删/409 失败提示全过
 - **375px 窄屏审计（2026-11-04）**：posts/media/dashboard 零溢出，posts/media pager fits（12 篇 2 页、30 张 2 页），media grid 2 列，act-row/resume-edit 适配——既有 640px 响应式块已覆盖新组件，零补丁
 - **媒体库新图高亮 + 批量全选（2026-11-04 本地攒批）**：上传成功记 freshUploads，媒体库渲染时卡片描主题色边 3 秒（到点 JS 摘除+清名单）；批量模式 batchbar 常显（含 0 张态）并加「全选本页/清空」。E2E：初始零高亮/2 名正确高亮（outline solid）/3s 摘除/全选 24 张/清空/取消隐藏全过
+- **Mimosa 深度安全扫描（2026-11-04）**：scan-2026-11-03T17-17-02.950Z-29a188de4c8b，seal sha256:cee8b432…，复核范围 findings **0**；runStatus **inconclusive**（调用图部分不完整——动态派发覆盖缺口，不据此宣称"项目安全"）。依赖侧（npm audit 官方源，生产依赖 5 条）：**critical astro**（define:vars XSS + server island，修复=astro@7.4.5 跨两大版本）、high sharp（libvips CVE）/zod/zod-to-ts、1 low。**升级待用户决策**：breaking 改动可能破坏已验证构建链，本夜不动。npmmirror 无 audit 端点，需 --registry=registry.npmjs.org
