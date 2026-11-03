@@ -2511,11 +2511,14 @@ function openRefsModal(name, refs) {
   document.addEventListener('keydown', onKey);
 }
 
-/** 图片放大查看：全屏遮罩，点击任意处或 Esc 关闭 */
+/** 图片放大查看：全屏遮罩，点击任意处或 Esc 关闭（纯 DOM 创建，杜绝任何 HTML 注入） */
 function openLightbox(src) {
   var mask = document.createElement('div');
   mask.className = 'lightbox-mask';
-  mask.innerHTML = '<img src="' + esc(src) + '" alt="放大预览">';
+  var img = document.createElement('img');
+  img.src = src;
+  img.alt = '放大预览';
+  mask.appendChild(img);
   document.body.appendChild(mask);
   function close() {
     document.removeEventListener('keydown', onKey);
