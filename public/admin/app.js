@@ -2717,6 +2717,12 @@ function bindMedia() {
   $('#pick-btn').addEventListener('click', function () {
     fi.click();
   });
+  // 整个拖拽区可点：只认直接落在拖拽区上的点击（点「选择文件」按钮时 target 是按钮，
+  // 交给它自己的 handler，避免同一事件触发两次选文件）
+  dz.addEventListener('click', function (e) {
+    if (e.target !== dz) return;
+    fi.click();
+  });
   fi.addEventListener('change', function () {
     uploadFiles(Array.prototype.slice.call(fi.files));
     fi.value = '';
