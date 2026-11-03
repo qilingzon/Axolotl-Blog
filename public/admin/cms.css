@@ -1567,6 +1567,20 @@ a.stat:hover {
   flex-shrink: 0;
 }
 
+/* 可点的动态行：整行直达编辑器，悬停提示色 */
+a.act-row--link {
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+a.act-row--link:hover .act-row__msg {
+  color: var(--accent);
+}
+
+a.act-row--link:hover .act-row__sha {
+  color: var(--accent);
+}
+
 /* ---------- 文章列表分页（仅多页时渲染） ---------- */
 .pager {
   display: flex;

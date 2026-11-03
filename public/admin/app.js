@@ -493,12 +493,21 @@ function renderDashboard() {
         } else {
           actHtml = commits
             .map(function (c) {
-              return (
-                '<div class="act-row"><span class="act-row__date">' +
+              // 《标题》反查当前文章列表：能对上就整行变链接直达编辑器，对不上保持原样
+              var m = (c.message || '').match(/《(.+?)》/);
+              var hit = m
+                ? posts.filter(function (p) {
+                    return p.title === m[1];
+                  })[0]
+                : null;
+              var inner =
+                '<span class="act-row__date">' +
                 esc(fmtStamp(c.date) || '') + '</span><span class="act-row__msg" title="' +
                 esc(c.message || '') + '">' + esc(c.message || '（无提交说明）') +
-                '</span><span class="act-row__sha">' + esc(c.short || '') + '</span></div>'
-              );
+                '</span><span class="act-row__sha">' + esc(c.short || '') + '</span>';
+              return hit
+                ? '<a class="act-row act-row--link" href="#/editor/' + encodeURIComponent(hit.slug) + '" title="点开编辑这篇文章">' + inner + '</a>'
+                : '<div class="act-row">' + inner + '</div>';
             })
             .join('');
         }
