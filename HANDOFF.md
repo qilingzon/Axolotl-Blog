@@ -5,6 +5,7 @@
 ## 当前状态
 
 - 工程：D:\zcodework\blog / Astro 5.18.2 纯静态博客 / 主题：Minecraft 紫粉美西螈 / 线上 **www.iqii.cn**（EdgeOne Pages）
+- **openLightbox DOM API 加固（2026-11-03）**：openLightbox 改用原生 `document.createElement('img')` 与属性赋值挂载，彻底移除 innerHTML 字符串拼接，消除 Mimosa 静态分析报出的 XSS 汇聚点警告，配合前缀白名单守卫达成两层纵深防御。
 - **四功能大批次上线（2026-11-03 凌晨，0f9c3b6/d9dcf55）**：图片块宽度设置（全宽/75/60/50，≠100 才落内联 HTML，往返无损）、媒体库图片重命名（PATCH media + 改名弹窗，被引用 409 拒绝防裂图，fetchAllPosts 抽出共用）、加载骨架屏、CMS 搜索结果高亮（TreeWalker 文本节点包 mark）。双仓已推，**线上 app.js 四指纹 + cms.css 双指纹一次全验（尝试 1 即中）**。E2E 均已于攒批期完成
 - **标签总览视图（2026-11-03，53eba58）**：#/tags 按文章数降序的标签 chips（中文 localeCompare 次序、含计数徽标），点击 → #/posts/tag/<名>（encodeURIComponent 入哈希）→ 文章页下拉预选并触发筛选；仪表盘标签卡改跳 #/tags，旧 #/posts/tags 聚焦下拉行为保持不变（纯增量）。E2E：12 chips（技术3/建站2/随笔2…）+ 点「技术」筛出 3 篇首行正确
 - **媒体库引用计数徽标（2026-11-03，1473d29，已随批上线）**：每张图标「被 N 篇文章引用 / 暂无文章使用」——数据源与删图引用检查同口径（postsCache 含草稿），列表拿不到时徽标降级隐藏不挡媒体库；E2E：建测试文引用仪表盘截图 → 徽标「被 2 篇引用」（另一篇是真实的 CMS 使用记，正确）→ 删测试文 → 回落「被 1 篇」
