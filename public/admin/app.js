@@ -2289,7 +2289,11 @@ function renderMedia() {
         }
         // 点缩略图放大查看（Esc/点击任意处关闭）
         var img = e.target.closest('.media-item img');
-        if (img) openLightbox(img.src);
+        if (img) {
+          // 只放行上传目录内的相对路径（防御纵深：名字服务端白名单 + 这里路径前缀校验，杜绝任意 src 注入）
+          var u = new URL(img.src, location.href);
+          if (u.origin === location.origin && u.pathname.indexOf('/assets/uploads/') === 0) openLightbox(u.pathname);
+        }
       });
       var searchEl = $('#media-search');
       var typeEl = $('#media-type');
