@@ -1463,6 +1463,15 @@ a.stat:hover {
   white-space: nowrap;
 }
 
+/* 选图器里的文件大小小字（与媒体库口径一致） */
+.picker__size {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* 预览里的任务清单勾选框 */
 .md-body li.task {
   list-style: none;

@@ -1682,7 +1682,8 @@ function createBlockEditor(deps) {
             ? images.map(function (im) {
                 return (
                   '<button type="button" class="picker__item" data-url="' + esc(im.url) + '" title="' + esc(im.name) + '">' +
-                  '<img src="' + esc(im.url) + '" alt=""><span>' + esc(im.name) + '</span></button>'
+                  '<img src="' + esc(im.url) + '" alt=""><span>' + esc(im.name) +
+                  '<i class="picker__size">' + fmtSize(im.size) + '</i></span></button>'
                 );
               }).join('')
             : '<div class="empty-tip">媒体库还是空的，先上传一张吧</div>') +
