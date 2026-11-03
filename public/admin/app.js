@@ -659,9 +659,28 @@ function renderPosts(mode) {
           pagerEl.innerHTML = '';
         }
         var slice = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-        listEl.innerHTML = slice.length
-          ? slice.map(function (p) { return postRowHtml(p, kw); }).join('')
-          : '<div class="empty-tip"><img src="/assets/axolotl-wild.png" alt=""><br>没有匹配的文章</div>';
+        if (slice.length) {
+          listEl.innerHTML = slice.map(function (p) { return postRowHtml(p, kw); }).join('');
+        } else {
+          // 有筛选条件时给个一键清空；真没文章时文案与从前一字不差（负优化禁令）
+          var hasFilter = kw || tag || draftOnly || sort;
+          listEl.innerHTML =
+            '<div class="empty-tip"><img src="/assets/axolotl-wild.png" alt=""><br>' +
+            (hasFilter
+              ? '没有匹配的文章<br><button type="button" class="btn btn--ghost btn--sm" id="clear-filters-btn" style="margin-top:10px">清空筛选条件</button>'
+              : '没有匹配的文章') +
+            '</div>';
+          var cfb = listEl.querySelector('#clear-filters-btn');
+          if (cfb) {
+            cfb.addEventListener('click', function () {
+              $('#post-search').value = '';
+              $('#post-tag').value = '';
+              $('#post-draft').checked = false;
+              $('#post-sort').value = '';
+              refresh(true);
+            });
+          }
+        }
         // 搜索命中高亮：TreeWalker 只包文本节点里的匹配段，不碰已转义的 HTML 结构
         if (kw) {
           listEl.querySelectorAll('.post-row__title').forEach(function (el) {
@@ -2048,6 +2067,9 @@ function bindEditor(origSlug, post) {
     var n = easyMode ? blk.countChars() : ta.value.replace(/\s/g, '').length;
     // 阅读时长按中文 400 字/分钟估算，至少 1 分钟
     var text = n ? '约 ' + n + ' 字' : '';
+    // 正文有图才带「N 图」，没图时这一段不出现（负优化禁令）
+    var imgCount = (currentBody().match(/!\[[^\]]*\]\([^)]+\)/g) || []).length;
+    if (text && imgCount) text += ' · ' + imgCount + ' 图';
     // 可选小目标：localStorage 存目标字数，写够显示进度与达标彩蛋；没设时展示与从前完全一致
     var goal = parseInt(localStorage.getItem(WORD_GOAL_KEY), 10);
     var done = false;
