@@ -2333,7 +2333,26 @@ function renderMedia() {
         });
       }
 
-      function gridHtml(list) {
+      // 搜索命中高亮：文件名是 ASCII 白名单字符，先切分段再各自 esc，mark 不碰转义边界
+      function highlightName(name, kw2) {
+        if (!kw2) return esc(name);
+        var lower = name.toLowerCase();
+        var out = '';
+        var pos = 0;
+        for (;;) {
+          var hit = lower.indexOf(kw2, pos);
+          if (hit === -1) {
+            out += esc(name.slice(pos));
+            break;
+          }
+          out += esc(name.slice(pos, hit));
+          out += '<mark class="search-hit">' + esc(name.slice(hit, hit + kw2.length)) + '</mark>';
+          pos = hit + kw2.length;
+        }
+        return out;
+      }
+
+      function gridHtml(list, kw) {
         return list.length
           ? '<div class="media-grid">' +
               list
@@ -2342,7 +2361,7 @@ function renderMedia() {
                     '<div class="media-item"><label class="media-item__pick" title="勾选批量删除"><input type="checkbox" data-pick="' + esc(im.name) + '"><span class="media-item__pickbox"></span></label>' +
                     '<img src="' + esc(im.url) + '" alt="" loading="lazy">' +
                     '<div class="media-item__bar"><span class="media-item__name" title="' + esc(im.name) + '">' +
-                    esc(im.name) + '（' + fmtSize(im.size) + '）</span>' +
+                    highlightName(im.name, kw) + '（' + fmtSize(im.size) + '）</span>' +
                     '<span class="media-item__dims"></span></div>' +
                     (refsMap
                       ? (refsMap[im.name] && refsMap[im.name].length
@@ -2463,7 +2482,7 @@ function renderMedia() {
             }
           }
           var slice = hit.slice((mPage - 1) * MEDIA_PAGE_SIZE, mPage * MEDIA_PAGE_SIZE);
-          $('#media-list').innerHTML = gridHtml(slice);
+          $('#media-list').innerHTML = gridHtml(slice, kw);
           attachDims($('#media-list'));
         }
         if (searchEl) searchEl.addEventListener('input', function () { applyFilter(true); });
