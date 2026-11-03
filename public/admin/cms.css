@@ -1064,6 +1064,25 @@ a.stat:hover {
   font-weight: 700;
 }
 
+/* 继续上次编辑：stats 与最近文章之间的虚线提示条，只在有记录时渲染 */
+.resume-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 1px dashed var(--accent);
+  border-radius: 10px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.resume-edit:hover {
+  background: var(--surface-2);
+}
+
 .ed-topbar__btn {
   padding: 5px 10px;
   font-family: var(--font-display);

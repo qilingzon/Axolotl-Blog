@@ -248,6 +248,7 @@ var ENDPOINTS = {
 /** slug 白名单：与后端一致（ASCII 字母数字开头，仅 ._-） */
 var SLUG_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,80}$/;
 var WORD_GOAL_KEY = 'cms-word-goal'; // 写作小目标：目标字数存 localStorage，跨会话记住
+var LAST_EDIT_KEY = 'cms-last-edit'; // 继续上次编辑：最近保存的文章 {slug, title, at}，仪表盘给个直达入口
 
 function api(method, endpoint, opts) {
   opts = opts || {};
@@ -468,6 +469,21 @@ function renderDashboard() {
         return p.draft;
       }).length;
       var latest = posts.slice(0, 6);
+      // 「继续上次编辑」：只在记录存在且那篇文章还在时出现，没有就当没这回事（负优化禁令）
+      var lastEdit = null;
+      try {
+        lastEdit = JSON.parse(localStorage.getItem(LAST_EDIT_KEY) || 'null');
+      } catch (e) {}
+      var lastPost =
+        lastEdit && lastEdit.slug
+          ? posts.filter(function (p) {
+              return p.slug === lastEdit.slug;
+            })[0]
+          : null;
+      var resumeHtml = lastPost
+        ? '<a class="resume-edit" href="#/editor/' + encodeURIComponent(lastPost.slug) + '" title="接着上次写到一半的文章">' +
+          '✏️ 继续上次：《' + esc(lastPost.title || lastPost.slug) + '》</a>'
+        : '';
       return activity.then(function (commits) {
         var actHtml;
         if (commits === null) {
@@ -494,6 +510,7 @@ function renderDashboard() {
           statCard(Object.keys(tags).length, '个标签', '/assets/axolotl-gold.png', '#/tags', '看标签总览') +
           statCard(drafts, '篇草稿', '/assets/axolotl-wild.png', '#/posts/draft', '只看草稿') +
           '</div>' +
+          resumeHtml +
           '<div class="card"><h3 style="margin-top:0">最近文章</h3>' +
           (latest.length
             ? latest.map(postRowHtml).join('')
@@ -2170,6 +2187,10 @@ function bindEditor(origSlug, post) {
         editorGuard = null; // 保存成功后的跳转不拦截
         lastSavedAt = Date.now();
         localStorage.removeItem('cms-autodraft');
+        // 记下最近保存的文章，仪表盘出「继续上次编辑」直达入口
+        try {
+          localStorage.setItem(LAST_EDIT_KEY, JSON.stringify({ slug: slug, title: $('#f-title').value.trim(), at: Date.now() }));
+        } catch (e) {}
         if (data && data.warn) {
           toast(data.warn, true); // 改名的旧文件删除失败：新文章已保存，提醒手动清理
         } else {
@@ -2186,12 +2207,48 @@ function bindEditor(origSlug, post) {
 
   if (!isNew) {
     $('#del-btn').addEventListener('click', function () {
-      confirmModal('删除文章', '确定删除《' + post.title + '》吗？此操作会从仓库移除文件，不可撤销。', '删除')
-        .then(function (yes) {
+      // 孤儿图片提示：删除后仅被本文引用的图会失去唯一引用——算出来放进确认弹窗，纯提示不拦操作
+      var refNames = [];
+      String(post.body || '').replace(/\/assets\/uploads\/([0-9A-Za-z._-]+)/g, function (_, n) {
+        refNames.push(n);
+        return '';
+      });
+      var postsP =
+        state.postsCache && state.postsCache.map
+          ? Promise.resolve(state.postsCache)
+          : api('GET', 'posts')
+              .then(function (d) {
+                state.postsCache = d.posts || [];
+                return state.postsCache;
+              })
+              .catch(function () {
+                return null;
+              });
+      postsP.then(function (list) {
+        var orphans = [];
+        if (list && refNames.length) {
+          orphans = refNames.filter(function (n) {
+            return !list.some(function (p) {
+              return p.slug !== origSlug && String(p.body || '').indexOf('/assets/uploads/' + n) !== -1;
+            });
+          });
+        }
+        var tip = '确定删除《' + post.title + '》吗？此操作会从仓库移除文件，不可撤销。';
+        if (orphans.length) {
+          var shown =
+            orphans.slice(0, 3).join('、') + (orphans.length > 3 ? ' 等 ' + orphans.length + ' 张' : '');
+          tip += '注意：' + shown + ' 只有这篇文章在用，删除后记得去媒体库清理。';
+        }
+        confirmModal('删除文章', tip, '删除').then(function (yes) {
           if (!yes) return;
           api('DELETE', 'posts', { slug: origSlug })
             .then(function () {
               editorGuard = null; // 删除成功后的跳转不拦截
+              // 删的就是「上次编辑」那篇的话，把入口一并清掉，别让仪表盘指去 404
+              try {
+                var last = JSON.parse(localStorage.getItem(LAST_EDIT_KEY) || 'null');
+                if (last && last.slug === origSlug) localStorage.removeItem(LAST_EDIT_KEY);
+              } catch (e) {}
               toast('已删除');
               location.hash = '#/posts';
             })
@@ -2199,6 +2256,7 @@ function bindEditor(origSlug, post) {
               toast(err.message, true);
             });
         });
+      });
     });
   }
 }
