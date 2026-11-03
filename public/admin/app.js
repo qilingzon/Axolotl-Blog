@@ -2415,7 +2415,7 @@ function renderMedia() {
         '<div id="media-list">' + gridHtml(images) + '</div>' +
         (images.length > MEDIA_PAGE_SIZE ? '<div id="media-pager"></div>' : '') +
         (images.length > 3
-          ? '<div id="media-batchbar" hidden><span id="media-batch-count">已选 0 张</span><span class="spacer"></span><button class="btn btn--danger btn--sm" id="media-batch-del">删除所选</button><button type="button" class="ed-topbar__btn" id="media-batch-cancel">取消</button></div>'
+          ? '<div id="media-batchbar" hidden><span id="media-batch-count">已选 0 张</span><span class="spacer"></span><button type="button" class="ed-topbar__btn" id="media-batch-all" title="勾上本页所有图">全选本页</button><button type="button" class="ed-topbar__btn" id="media-batch-none" title="全部取消勾选">清空</button><button class="btn btn--danger btn--sm" id="media-batch-del">删除所选</button><button type="button" class="ed-topbar__btn" id="media-batch-cancel">取消</button></div>'
           : '');
       renderShell('media', html);
       attachDims($('#media-list'));
@@ -2513,7 +2513,7 @@ function renderMedia() {
         var batchOn = false;
         function updateBatchBar() {
           var n = $('#media-list').querySelectorAll('input[data-pick]:checked').length;
-          $('#media-batchbar').hidden = n === 0;
+          $('#media-batchbar').hidden = !batchOn;
           $('#media-batch-count').textContent = '已选 ' + n + ' 张';
         }
         function toggleBatch(forceOff) {
@@ -2535,6 +2535,18 @@ function renderMedia() {
           });
           $('#media-batch-cancel').addEventListener('click', function () {
             toggleBatch(true);
+          });
+          $('#media-batch-all').addEventListener('click', function () {
+            $('#media-list').querySelectorAll('input[data-pick]').forEach(function (c) {
+              c.checked = true;
+            });
+            updateBatchBar();
+          });
+          $('#media-batch-none').addEventListener('click', function () {
+            $('#media-list').querySelectorAll('input[data-pick]').forEach(function (c) {
+              c.checked = false;
+            });
+            updateBatchBar();
           });
           $('#media-list').addEventListener('click', function (e) {
             if (e.target.closest('.media-item__pick')) {
