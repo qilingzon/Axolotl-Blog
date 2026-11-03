@@ -768,6 +768,22 @@ a.stat:hover {
   color: var(--text-muted);
 }
 
+/* 文章行「链」按钮：复制前台链接，不离开当前行 */
+.row-link-btn {
+  flex: none;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.row-link-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 /* ---------- 媒体库 ---------- */
 
 .media-grid {

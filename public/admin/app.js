@@ -562,6 +562,8 @@ function postRowHtml(p, kw) {
     '<div class="post-row__meta"><span>' + fmtDate(p.pubDate) + '</span>' +
     '<span>' + (p.tags || []).map(function (t) { return '<span class="tag-chip">' + esc(t) + '</span>'; }).join(' ') + '</span></div>' +
     snippet + '</div>' +
+    // 草稿前台 404，「链」指向只有自己知道链接的预览页；已发布才给 /blog/ 链接
+    '<span class="row-link-btn" data-copylink="' + (p.draft ? '/preview/' : '/blog/') + encodeURIComponent(p.slug) + '/" title="' + (p.draft ? '复制预览页链接（草稿没有前台页）' : '复制前台文章链接') + '">链</span>' +
     '<span class="save-state">编辑 →</span></a>'
   );
 }
@@ -2521,6 +2523,21 @@ function bindMediaDelegates() {
   });
 
   $('#app').addEventListener('click', function (e) {
+    // 文章行「链」：复制前台链接，拦在行跳转之前
+    var linkBtn = e.target.closest('span[data-copylink]');
+    if (linkBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      navigator.clipboard
+        .writeText(location.origin + linkBtn.dataset.copylink)
+        .then(function () {
+          toast('已复制文章链接');
+        })
+        .catch(function () {
+          toast('复制失败，请手动复制：' + location.origin + linkBtn.dataset.copylink, true);
+        });
+      return;
+    }
     var copyBtn = e.target.closest('button[data-copy]');
     if (copyBtn) {
       var md = '![](' + copyBtn.dataset.copy + ')';
