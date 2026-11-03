@@ -2339,7 +2339,8 @@ function renderMedia() {
               list
                 .map(function (im) {
                   return (
-                    '<div class="media-item"><img src="' + esc(im.url) + '" alt="" loading="lazy">' +
+                    '<div class="media-item"><label class="media-item__pick" title="勾选批量删除"><input type="checkbox" data-pick="' + esc(im.name) + '"><span class="media-item__pickbox"></span></label>' +
+                    '<img src="' + esc(im.url) + '" alt="" loading="lazy">' +
                     '<div class="media-item__bar"><span class="media-item__name" title="' + esc(im.name) + '">' +
                     esc(im.name) + '（' + fmtSize(im.size) + '）</span>' +
                     '<span class="media-item__dims"></span></div>' +
@@ -2385,13 +2386,17 @@ function renderMedia() {
             '<option value="gif">GIF</option><option value="avif">AVIF</option></select>' +
             '<select id="media-sort" style="width:120px"><option value="">默认排序</option>' +
             '<option value="name-asc">名称 A→Z</option><option value="name-desc">名称 Z→A</option>' +
-            '<option value="size-desc">大小 大→小</option><option value="size-asc">大小 小→大</option></select>'
+            '<option value="size-desc">大小 大→小</option><option value="size-asc">大小 小→大</option></select>' +
+            '<button type="button" class="ed-topbar__btn" id="media-batch" title="勾选多张一起删">批量管理</button>'
           : '') +
         '</div>' +
         '<div class="dropzone" id="dropzone">把图片拖到这里，或 <button class="btn btn--sm" id="pick-btn" type="button">选择文件</button>（也可以直接 Ctrl+V 粘贴截图）</div>' +
         '<input type="file" id="file-input" accept="image/*" multiple hidden>' +
         '<div id="media-list">' + gridHtml(images) + '</div>' +
-        (images.length > MEDIA_PAGE_SIZE ? '<div id="media-pager"></div>' : '');
+        (images.length > MEDIA_PAGE_SIZE ? '<div id="media-pager"></div>' : '') +
+        (images.length > 3
+          ? '<div id="media-batchbar" hidden><span id="media-batch-count">已选 0 张</span><span class="spacer"></span><button class="btn btn--danger btn--sm" id="media-batch-del">删除所选</button><button type="button" class="ed-topbar__btn" id="media-batch-cancel">取消</button></div>'
+          : '');
       renderShell('media', html);
       attachDims($('#media-list'));
       $('#media-list').addEventListener('click', function (e) {
@@ -2474,6 +2479,83 @@ function renderMedia() {
           });
         }
         if (images.length > MEDIA_PAGE_SIZE) applyFilter(true);
+
+        // ---------- 批量管理：勾选多张一次删（>3 张才出现入口，关闭时界面零变化） ----------
+        var batchOn = false;
+        function updateBatchBar() {
+          var n = $('#media-list').querySelectorAll('input[data-pick]:checked').length;
+          $('#media-batchbar').hidden = n === 0;
+          $('#media-batch-count').textContent = '已选 ' + n + ' 张';
+        }
+        function toggleBatch(forceOff) {
+          batchOn = forceOff === true ? false : !batchOn;
+          $('#media-list').classList.toggle('media-batch-on', batchOn);
+          $('#media-batch').classList.toggle('active', batchOn);
+          $('#media-batch').textContent = batchOn ? '完成' : '批量管理';
+          if (!batchOn) {
+            $('#media-list').querySelectorAll('input[data-pick]').forEach(function (c) {
+              c.checked = false;
+            });
+          }
+          updateBatchBar();
+        }
+        var batchBtn = $('#media-batch');
+        if (batchBtn) {
+          batchBtn.addEventListener('click', function () {
+            toggleBatch();
+          });
+          $('#media-batch-cancel').addEventListener('click', function () {
+            toggleBatch(true);
+          });
+          $('#media-list').addEventListener('click', function (e) {
+            if (e.target.closest('.media-item__pick')) {
+              setTimeout(updateBatchBar, 0); // label 默认行为翻转 checked 之后再计数
+            }
+          });
+          $('#media-batch-del').addEventListener('click', function () {
+            var names = Array.prototype.map.call(
+              $('#media-list').querySelectorAll('input[data-pick]:checked'),
+              function (c) {
+                return c.dataset.pick;
+              }
+            );
+            if (!names.length) return;
+            confirmModal(
+              '批量删除图片',
+              '确定删除选中的 ' + names.length + ' 张图片吗？（' +
+                names.slice(0, 3).join('、') + (names.length > 3 ? ' 等' : '') +
+                '）被文章引用的会保留。',
+              '删除'
+            ).then(function (yes) {
+              if (!yes) return;
+              var doneN = 0;
+              var failNames = [];
+              var chain = Promise.resolve();
+              names.forEach(function (n) {
+                chain = chain.then(function () {
+                  return api('DELETE', 'media', { query: { name: n } }).then(
+                    function () {
+                      doneN++;
+                    },
+                    function () {
+                      failNames.push(n);
+                    }
+                  );
+                });
+              });
+              chain.then(function () {
+                toast(
+                  '已删 ' + doneN + ' 张' +
+                    (failNames.length
+                      ? '，' + failNames.length + ' 张失败' +
+                        (failNames.length <= 3 ? '（' + failNames.join('、') + '）' : '')
+                      : '')
+                );
+                renderMedia();
+              });
+            });
+          });
+        }
       }
       bindMedia();
     })

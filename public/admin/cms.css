@@ -797,6 +797,49 @@ a.stat:hover {
   border-radius: var(--radius-sm);
   background: var(--surface);
   overflow: hidden;
+  position: relative;
+}
+
+/* 批量管理：勾选框只在批量模式下出现，平时零变化 */
+.media-item__pick {
+  display: none;
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+}
+
+#media-list.media-batch-on .media-item__pick {
+  display: inline-flex;
+  padding: 4px;
+  background: var(--surface);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.media-item__pickbox {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+/* 底部批量操作条：勾选后浮现 */
+#media-batchbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-top: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+/* 批量模式下勾中的卡片描一圈主题色 */
+#media-list.media-batch-on .media-item:has(input[data-pick]:checked) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .media-item img {
