@@ -385,12 +385,14 @@ function renderShell(active, contentHtml) {
     '</nav>' +
     '<button class="icon-btn" id="theme-btn" title="切换主题">' + esc((THEMES.find(function (t) { return t.id === themeNow; }) || THEMES[0]).label) + '</button>' +
     '<a class="icon-btn" href="/" target="_blank" rel="noopener">看博客</a>' +
+    '<button class="icon-btn" id="help-btn" title="使用技巧速查">?</button>' +
     '<button class="icon-btn" id="logout-btn">退出</button>' +
     '</div></header>' +
     '<main class="shell">' + contentHtml + '</main>';
   $('#logout-btn').addEventListener('click', function () {
     logout(true);
   });
+  $('#help-btn').addEventListener('click', openHelpModal);
   $('#theme-btn').addEventListener('click', function () {
     var cur = document.documentElement.dataset.theme || 'pink-soft';
     var idx = THEMES.findIndex(function (t) { return t.id === cur; });
@@ -405,6 +407,37 @@ function renderShell(active, contentHtml) {
 
 function loadingTip(text) {
   return '<div class="loading">' + esc(text || '正在加载……') + '</div>';
+}
+
+/** 使用技巧速查：把散落的小功能集中告示，帮「纯浏览器」用户发现它们 */
+function openHelpModal() {
+  var mask = document.createElement('div');
+  mask.className = 'modal-mask';
+  mask.innerHTML =
+    '<div class="modal"><h3>使用技巧速查</h3>' +
+    '<div class="help-list">' +
+    '<p><b>快捷键</b>：N = 写新文章 · Ctrl/Cmd+S = 保存（打字时直接按）</p>' +
+    '<p><b>写作小目标</b>：编辑器顶栏的字数那行字是可以点的，设个目标写够会有美西螈庆祝</p>' +
+    '<p><b>文章列表</b>：每行的「链」复制前台链接（草稿给的是秘密预览链接）；搜索没结果时有一键清空筛选</p>' +
+    '<p><b>媒体库</b>：「批量管理」可勾选多张一起删（支持全选本页）；刚上传的图会亮一下；点缩略图放大</p>' +
+    '<p><b>进阶写作</b>：工具栏的「选图」从媒体库挑一张插到光标处，不用手打图片地址</p>' +
+    '<p><b>仪表盘</b>：「继续上次」直达最近编辑的文章；动态行点一下直达对应文章</p>' +
+    '</div>' +
+    '<div class="modal__actions"><button class="btn btn--ghost" data-act="close">知道啦</button></div></div>';
+  document.body.appendChild(mask);
+  function close() {
+    document.removeEventListener('keydown', onKey);
+    mask.remove();
+  }
+  function onKey(e) {
+    if (e.key === 'Escape' && document.querySelectorAll('.modal-mask').length <= 1) close();
+  }
+  mask.addEventListener('click', function (e) {
+    var act = e.target.getAttribute && e.target.getAttribute('data-act');
+    if (act === 'close') close();
+    else if (e.target === mask) close();
+  });
+  document.addEventListener('keydown', onKey);
 }
 
 // ---------- 登录视图 ----------

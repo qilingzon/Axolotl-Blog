@@ -1657,6 +1657,17 @@ a.act-row--link:hover .act-row__sha {
   color: var(--accent);
 }
 
+/* 使用技巧速查弹窗的条目间距 */
+.help-list p {
+  margin: 8px 0;
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+.help-list b {
+  color: var(--accent);
+}
+
 /* ---------- 文章列表分页（仅多页时渲染） ---------- */
 .pager {
   display: flex;
