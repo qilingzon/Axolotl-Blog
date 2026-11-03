@@ -777,6 +777,13 @@ function renderTags() {
       var names = Object.keys(counts).sort(function (a, b) {
         return counts[b] - counts[a] || a.localeCompare(b, 'zh-CN');
       });
+      // 每个标签的最新使用时间：只进 title 提示，界面外观零变化（负优化禁令）
+      var latestByTag = {};
+      posts.forEach(function (p) {
+        (p.tags || []).forEach(function (t) {
+          if (!latestByTag[t] || String(p.pubDate) > latestByTag[t]) latestByTag[t] = p.pubDate;
+        });
+      });
       var html =
         '<div class="page-head"><h1>标签总览</h1><span style="color:var(--text-muted);font-size:14px">' +
         names.length + ' 个标签 · 点一个看它的文章</span></div>' +
@@ -784,8 +791,10 @@ function renderTags() {
           ? '<div class="tags-view">' +
             names
               .map(function (t) {
+                var latest = latestByTag[t] ? fmtDate(latestByTag[t]) : '';
                 return (
-                  '<button type="button" class="tags-view__chip" data-tag="' + esc(t) + '">' +
+                  '<button type="button" class="tags-view__chip" data-tag="' + esc(t) + '"' +
+                  ' title="共 ' + counts[t] + ' 篇' + (latest ? ' · 最新 ' + esc(latest) : '') + '">' +
                   esc(t) + '<span class="tags-view__count">' + counts[t] + '</span></button>'
                 );
               })
@@ -3028,7 +3037,9 @@ function uploadImageFile(file) {
 
 function uploadFiles(files) {
   if (!files.length) return;
-  toast('正在压缩并上传 ' + files.length + ' 张图片……');
+  var total = files.length;
+  var done = 0;
+  toast('正在压缩并上传 ' + total + ' 张图片……');
   var chain = Promise.resolve();
   Array.prototype.forEach.call(files, function (f) {
     chain = chain
@@ -3036,7 +3047,12 @@ function uploadFiles(files) {
         return uploadImageFile(f);
       })
       .then(function (r) {
-        toast('已上传：' + f.name + (r && r.overwritten ? '（已覆盖同名图片）' : ''));
+        done++;
+        // 单张保持原文案；多张才带 n/total 进度（负优化禁令）
+        toast(
+          (total > 1 ? '已上传 ' + done + '/' + total + '：' : '已上传：') +
+            f.name + (r && r.overwritten ? '（已覆盖同名图片）' : '')
+        );
       })
       .catch(function (err) {
         toast(err.message, true);
