@@ -436,7 +436,8 @@ function openHelpModal() {
     '<p><b>写作小目标</b>：编辑器顶栏的字数那行字是可以点的，设个目标写够会有美西螈庆祝</p>' +
     '<p><b>文章列表</b>：每行的「链」复制前台链接（草稿给的是秘密预览链接）；搜索没结果时有一键清空筛选</p>' +
     '<p><b>媒体库</b>：「批量管理」可勾选多张一起删（支持全选本页）；刚上传的图会亮一下；点缩略图放大</p>' +
-    '<p><b>进阶写作</b>：工具栏的「选图」从媒体库挑一张插到光标处，不用手打图片地址</p>' +
+    '<p><b>进阶写作</b>：工具栏的「选图」从媒体库挑一张插到光标处，不用手打图片地址；格式按钮点完直接打字就行，再点一次取消</p>' +
+    '<p><b>攒批入库</b>：顶栏 ⚙ 里可设「攒几篇自动入库」；仪表盘会提醒还没入库的改动，随时可点「立即入库」</p>' +
     '<p><b>仪表盘</b>：「继续上次」直达最近编辑的文章；动态行点一下直达对应文章</p>' +
     '</div>' +
     '<div class="modal__actions"><button class="btn btn--ghost" data-act="close">知道啦</button></div></div>';
@@ -779,7 +780,8 @@ function postRowHtml(p, kw) {
     '<a class="post-row" href="#/editor/' + encodeURIComponent(p.slug) + '">' +
     '<img src="' + img + '" alt="">' +
     '<div class="post-row__main"><div class="post-row__title">' + esc(p.title) +
-    (p.draft ? ' <span class="badge-draft">草稿</span>' : '') + '</div>' +
+    (p.draft ? ' <span class="badge-draft">草稿</span>' : '') +
+    (p.pending ? ' <span class="badge-pending" title="最新版存在 KV 里还没入库，访客已能看到；入库后此标消失">未入库</span>' : '') + '</div>' +
     '<div class="post-row__meta"><span>' + fmtDate(p.pubDate) + '</span>' +
     '<span>' + (p.tags || []).map(function (t) { return '<span class="tag-chip">' + esc(t) + '</span>'; }).join(' ') +
     (imgCount ? '<span class="tag-chip tag-chip--imgs" title="正文里有 ' + imgCount + ' 张图">' + imgCount + ' 图</span>' : '') + '</span></div>' +

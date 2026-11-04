@@ -1272,6 +1272,18 @@ a.stat:hover {
   color: var(--accent);
 }
 
+/* 未入库徽标：攒批中的文章在列表里的灰调小标（与 badge-draft 同形；用主题变量自动适配三主题） */
+.badge-pending {
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0 8px;
+  font-size: 12px;
+  font-family: var(--font-display);
+  vertical-align: middle;
+}
+
 .ed-topbar__btn {
   padding: 5px 10px;
   font-family: var(--font-display);
