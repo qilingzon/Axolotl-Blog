@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 const mod = await import('../edge-functions/api/[[default]].js');
 const { parseFrontmatter, serializeFrontmatter, normalizeMeta, normalizeDate, parseScalar } = mod;
 const { IMG_NAME_RE, kvImageKey, kvImageName, imgContentType } = mod;
+const { SLUG_RE, kvPostKey, mergePostsWithPending } = mod;
 
 let pass = 0;
 let fail = 0;
@@ -175,6 +176,45 @@ t('imgContentType 按扩展名给对 MIME', () => {
   assert.equal(imgContentType('a.webp'), 'image/webp');
   assert.equal(imgContentType('a.avif'), 'image/avif');
   assert.equal(imgContentType('a.txt'), 'application/octet-stream');
+});
+
+// ---------- 文章 KV 攒批：key 编码与列表合并 ----------
+
+t('kvPostKey 往返一致且只含 KV 允许字符（p_ 前缀 + 十六进制）', () => {
+  const key = kvPostKey('my-post_2026.slug');
+  assert.match(key, /^[0-9A-Za-z_]+$/);
+  assert.ok(key.startsWith('p_'));
+  assert.notEqual(key, kvPostKey('other-post'));
+});
+
+t('mergePostsWithPending：pending 覆盖同 slug 的仓库版并标 pending', () => {
+  const repo = [{ slug: 'a', title: '仓库版A', body: 'old', pubDate: '2026-01-01', draft: false }];
+  const pend = [{ slug: 'a', title: 'KV版A', body: 'new', pubDate: '2026-01-02', draft: false }];
+  const out = mergePostsWithPending(repo, pend);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].title, 'KV版A');
+  assert.equal(out[0].pending, true);
+  assert.equal(out[0].sha, '');
+});
+
+t('mergePostsWithPending：pending-only 新篇追加、空 pending 零变化', () => {
+  const repo = [{ slug: 'a', title: 'A', body: '', pubDate: '2026-01-01' }];
+  const out1 = mergePostsWithPending(repo, [{ slug: 'b', title: 'B新', body: 'x', pubDate: '2026-01-03' }]);
+  assert.equal(out1.length, 2);
+  assert.equal(out1[1].slug, 'b');
+  assert.equal(out1[1].pending, true);
+  const out2 = mergePostsWithPending(repo, []);
+  assert.equal(out2.length, 1);
+  assert.equal(out2[0].pending, undefined);
+  const out3 = mergePostsWithPending(null, [{ slug: 'c', title: 'C', body: '', pubDate: '2026-01-01' }]);
+  assert.equal(out3.length, 1);
+  assert.equal(out3[0].pending, true);
+});
+
+t('SLUG_RE 白名单：合法 slug 过、路径穿越被拒（与后端一致）', () => {
+  assert.ok(SLUG_RE.test('my-post_2026'));
+  assert.ok(!SLUG_RE.test('../x'));
+  assert.ok(!SLUG_RE.test('中文slug'));
 });
 
 console.log('');

@@ -263,9 +263,10 @@ export async function onRequest(context) {
           renewed: true,
         });
       }
-      return json({ user: auth.u, expiresAt: auth.e });
+      return json({ user: auth.u, expiresAt: auth.e, kv: !!kvStore() });
     }
     if (path === '/api/posts' && method === 'GET') return await handleListPosts();
+    if (path === '/api/posts-flush' && method === 'POST') return await handlePostsFlush();
     if (path.startsWith('/api/posts/')) {
       return await handlePostItem(method, path.slice('/api/posts/'.length), request);
     }
@@ -326,7 +327,7 @@ async function handleLogin(request) {
     safeEqual(String(password), String(CFG.pass()))
   ) {
     clearFails();
-    return json({ token: await issueToken(String(username)), expiresAt: Date.now() + tokenTtlMs() });
+    return json({ token: await issueToken(String(username)), expiresAt: Date.now() + tokenTtlMs(), kv: !!kvStore() });
   }
   recordFail();
   // 第 5 次失败即触发锁定窗口，直接告知锁定；其余次数预告剩余额度
@@ -463,10 +464,150 @@ async function fetchAllPosts() {
   }
 }
 
+// ---------- 文章 KV 攒批层：保存即时可见，满 N 篇打包成 1 个 commit ----------
+// 模式由前端保存请求带 saveMode：batch=修改/草稿进 KV 攒批（新文章仍即时入库）、
+// all=新文章也攒批、immediate=与历史版本逐字一致（每保存一次构建一次）。
+// KV 里存渲染快照 {slug,meta,body,html,at}；待入库索引 pend={slug: at(ms)}。
+
+const KV_PEND_KEY = 'pend';
+
+function kvPostKey(slug) {
+  const bytes = enc.encode(slug);
+  let hex = '';
+  for (const b of bytes) hex += b.toString(16).padStart(2, '0');
+  return 'p_' + hex;
+}
+
+/** 读待入库索引 {slug: at(ms)}；缺失/损坏 → 空对象（不挡路） */
+async function kvReadPend(kv) {
+  try {
+    const raw = await kv.get(KV_PEND_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed && typeof parsed === 'object') return parsed;
+  } catch {
+    // 索引坏了按空处理，下次写入重建
+  }
+  return {};
+}
+
+async function kvWritePend(kv, pend) {
+  await kv.put(KV_PEND_KEY, JSON.stringify(pend));
+}
+
+/** 写单篇 KV 快照并登记待入库；返回攒批计数 */
+async function kvSavePost(kv, slug, meta, body, html) {
+  await kv.put(kvPostKey(slug), JSON.stringify({ slug, meta, body, html: String(html || ''), at: Date.now() }));
+  const pend = await kvReadPend(kv);
+  pend[slug] = Date.now();
+  await kvWritePend(kv, pend);
+  return Object.keys(pend).length;
+}
+
+/** 忘掉一篇的未入库快照（删除/已入库清理用），不存在也不报错 */
+async function kvForgetPost(kv, slug) {
+  try {
+    await kv.delete(kvPostKey(slug));
+  } catch {
+    // 删除失败不挡主流程
+  }
+  const pend = await kvReadPend(kv);
+  if (pend[slug] !== undefined) {
+    delete pend[slug];
+    await kvWritePend(kv, pend);
+  }
+}
+
+/** 纯函数（selftest 覆盖）：仓库列表与未入库条目合并——pending 覆盖同 slug、新篇追加并标 pending */
+function mergePostsWithPending(repoPosts, pendingItems) {
+  const bySlug = {};
+  const out = [];
+  (repoPosts || []).forEach((p) => {
+    bySlug[p.slug] = Object.assign({}, p);
+    out.push(bySlug[p.slug]);
+  });
+  (pendingItems || []).forEach((p) => {
+    if (bySlug[p.slug]) {
+      Object.assign(bySlug[p.slug], p, { pending: true, sha: '' });
+    } else {
+      const fresh = Object.assign({}, p, { pending: true, sha: '' });
+      bySlug[p.slug] = fresh;
+      out.push(fresh);
+    }
+  });
+  return out;
+}
+
 async function handleListPosts() {
-  const posts = await fetchAllPosts();
-  posts.sort((a, b) => String(b.pubDate).localeCompare(String(a.pubDate)));
-  return json({ posts });
+  const kv = kvStore();
+  const pend = kv ? await kvReadPend(kv).catch(() => ({})) : {};
+  const pendingSlugs = Object.keys(pend).filter((s) => SLUG_RE.test(s));
+  const pendingItems = (
+    await Promise.all(
+      pendingSlugs.map(async (s) => {
+        try {
+          const raw = await kv.get(kvPostKey(s));
+          if (!raw) return null;
+          const v = JSON.parse(raw);
+          return Object.assign({ slug: s }, normalizeMeta(v.meta), { body: String(v.body || '') });
+        } catch {
+          return null;
+        }
+      })
+    )
+  ).filter(Boolean);
+  const oldestAt = pendingSlugs.length ? Math.min(...pendingSlugs.map((s) => pend[s] || 0)) : 0;
+
+  let posts;
+  let repoError = false;
+  try {
+    posts = await fetchAllPosts();
+  } catch (e) {
+    // GitHub 半边挂了：只要还有未入库改动就不让列表 500（前端提示仓库暂读不到）
+    if (!pendingItems.length) throw e;
+    posts = [];
+    repoError = true;
+  }
+  const merged = mergePostsWithPending(posts, pendingItems);
+  merged.sort((a, b) => String(b.pubDate).localeCompare(String(a.pubDate)));
+  return json({
+    posts: merged,
+    pending: pendingItems.length,
+    pendingOldest: oldestAt,
+    ...(repoError ? { repoError: true } : {}),
+  });
+}
+
+/** 仓库落盘一篇（新建/更新/改名共用）：PUT 文件 + 改名删旧；返回 warn 文案或空串 */
+async function commitPostToRepo(slug, content, meta, existing, oldSlug) {
+  await ghFetch(repoSegments('contents', `${POSTS_DIR}/${slug}.md`), {
+    method: 'PUT',
+    body: {
+      message: `CMS: ${existing ? '更新' : '新增'}《${meta.title}》${meta.draft ? '（草稿）' : ''}`,
+      content,
+      branch: CFG.branch(),
+      ...(existing ? { sha: existing.sha } : {}),
+    },
+  });
+  // slug 变更时删除旧文件。删除失败不能让整个保存失败（新文件已落库）：
+  // 否则用户重试会撞上自己刚建的新文件被 409 拒——把警告带回前端才是活路
+  let warn = '';
+  if (oldSlug && oldSlug !== slug && SLUG_RE.test(oldSlug)) {
+    const oldPath = `${POSTS_DIR}/${oldSlug}.md`;
+    const old = await ghFetch(repoSegments('contents', oldPath)).catch(() => null);
+    if (old) {
+      await ghFetch(repoSegments('contents', oldPath), {
+        method: 'DELETE',
+        body: {
+          message: `CMS: 《${meta.title}》改名为 ${slug}`,
+          sha: old.sha,
+          branch: CFG.branch(),
+        },
+      }).catch((e) => {
+        warn = `新文章已保存，但旧文件 ${oldSlug}.md 删除失败：${(e && e.message) || '未知错误'}。请稍后到文章列表手动删除旧篇，否则会出现重名文章。`;
+      });
+    }
+  }
+  return warn;
 }
 
 async function handlePostItem(method, slug, request) {
@@ -474,22 +615,43 @@ async function handlePostItem(method, slug, request) {
   const filePath = `${POSTS_DIR}/${slug}.md`;
 
   if (method === 'GET') {
-    const item = await ghFetch(repoSegments('contents', filePath)).catch((e) => {
-      if (e.status === 404) {
+    const kv = kvStore();
+    const item = await ghFetch(repoSegments('contents', filePath)).catch(async (e) => {
+      if (e.status === 404 && kv) {
+        // 攒批中的新文章仓库里还没有：回退 KV 快照，编辑器照常打开
+        const raw = await kv.get(kvPostKey(slug)).catch(() => null);
+        if (raw) return null;
         e.message = '文章不存在';
       }
       throw e;
     });
+    if (!item) {
+      const raw = await kv.get(kvPostKey(slug));
+      const v = JSON.parse(raw);
+      return json({ slug, sha: '', pending: true, ...normalizeMeta(v.meta), body: String(v.body || '') });
+    }
     const text = dec.decode(b64ToBytes(item.content || ''));
     const { meta, body } = parseFrontmatter(text);
-    return json({ slug, sha: item.sha, ...normalizeMeta(meta), body });
+    const pend = kv ? await kvReadPend(kv).catch(() => ({})) : {};
+    // 攒批中的文章优先回 KV 快照：编辑器必须显示用户最新保存的版本，而不是仓库里的上一版
+    if (pend[slug]) {
+      const raw = await kv.get(kvPostKey(slug)).catch(() => null);
+      if (raw) {
+        const v = JSON.parse(raw);
+        return json({ slug, sha: item.sha, pending: true, ...normalizeMeta(v.meta), body: String(v.body || '') });
+      }
+    }
+    return json({ slug, sha: item.sha, pending: !!pend[slug], ...normalizeMeta(meta), body });
   }
 
   if (method === 'PUT') {
     const input = await request.json();
     const meta = normalizeMeta(input.post || input);
     const body = String(input.body || '');
+    const html = String(input.html || '');
+    const saveMode = String(input.saveMode || '');
     const content = bytesToB64(enc.encode(serializeFrontmatter(meta, body)));
+    const oldSlug = String(input.oldSlug || '');
 
     // 已存在则取 sha（更新），不存在则新建
     const existing = await ghFetch(repoSegments('contents', filePath)).catch((e) => {
@@ -498,49 +660,48 @@ async function handlePostItem(method, slug, request) {
     });
     const isNew = !existing;
     // 撞名保护：目标已存在且不是同一篇（改名撞别人 / 新建撞旧文）→ 拒绝，绝不静默覆盖
-    const oldSlug = String(input.oldSlug || '');
     if (existing && oldSlug !== slug) {
       return fail('该文件名已被占用，请换一个再保存', 409);
     }
-    await ghFetch(repoSegments('contents', filePath), {
-      method: 'PUT',
-      body: {
-        message: `CMS: ${isNew ? '新增' : '更新'}《${meta.title}》${meta.draft ? '（草稿）' : ''}`,
-        content,
-        branch: CFG.branch(),
-        ...(existing ? { sha: existing.sha } : {}),
-      },
-    });
 
-    // slug 变更时删除旧文件。删除失败不能让整个保存失败（新文件已落库）：
-    // 否则用户重试会撞上自己刚建的新文件被 409 拒——把警告带回前端才是活路
-    let warn = '';
-    if (oldSlug && oldSlug !== slug && SLUG_RE.test(oldSlug)) {
-      const oldPath = `${POSTS_DIR}/${oldSlug}.md`;
-      const old = await ghFetch(repoSegments('contents', oldPath)).catch(() => null);
-      if (old) {
-        await ghFetch(repoSegments('contents', oldPath), {
-          method: 'DELETE',
-          body: {
-            message: `CMS: 《${meta.title}》改名为 ${slug}`,
-            sha: old.sha,
-            branch: CFG.branch(),
-          },
-        }).catch((e) => {
-          warn = `新文章已保存，但旧文件 ${oldSlug}.md 删除失败：${(e && e.message) || '未知错误'}。请稍后到文章列表手动删除旧篇，否则会出现重名文章。`;
-        });
+    const kv = kvStore();
+    if (kv && (saveMode === 'batch' || saveMode === 'all')) {
+      // 改名且旧篇尚未入库（纯 KV 态）→ 只搬 KV，不碰 git、不触发构建
+      if (oldSlug && oldSlug !== slug && SLUG_RE.test(oldSlug) && isNew) {
+        const oldInRepo = await ghFetch(repoSegments('contents', `${POSTS_DIR}/${oldSlug}.md`)).catch(() => null);
+        if (!oldInRepo) {
+          const pending = await kvSavePost(kv, slug, meta, body, html);
+          await kvForgetPost(kv, oldSlug);
+          return json({ ok: true, slug, created: true, kv: true, pending });
+        }
       }
+      if (isNew && saveMode !== 'all') {
+        // 新文章：没有静态页就无法热替换，攒批只会让它迟迟不可见 → 立即入库（1 次构建）
+        const warn = await commitPostToRepo(slug, content, meta, existing, oldSlug);
+        return json({ ok: true, slug, created: true, ...(warn ? { warn } : {}) });
+      }
+      // 已发布文章的修改 / 「全攒」模式的新文章：写 KV 即时可见 + 记攒批，git 等打包
+      const pending = await kvSavePost(kv, slug, meta, body, html);
+      return json({ ok: true, slug, created: isNew, kv: true, pending });
     }
+
+    // 现状路径（未绑 KV 或「即时」模式）：行为与历史版本逐字一致
+    const warn = await commitPostToRepo(slug, content, meta, existing, oldSlug);
     return json({ ok: true, slug, created: isNew, ...(warn ? { warn } : {}) });
   }
 
   if (method === 'DELETE') {
+    const kv = kvStore();
+    await (kv ? kvForgetPost(kv, slug) : Promise.resolve());
     const item = await ghFetch(repoSegments('contents', filePath)).catch((e) => {
       if (e.status === 404) {
+        // 仓库里本来就没有（攒批中的新文章）：纯 KV 删除，零构建
+        if (kv) return null;
         e.message = '文章不存在';
       }
       throw e;
     });
+    if (!item) return json({ ok: true, kvOnly: true });
     const { meta } = parseFrontmatter(dec.decode(b64ToBytes(item.content || '')));
     await ghFetch(repoSegments('contents', filePath), {
       method: 'DELETE',
@@ -557,6 +718,72 @@ async function handlePostItem(method, slug, request) {
 }
 
 // ---------- 版本历史接口（贴 GitHub commits API，全程只读 + 回滚复用 contents PUT） ----------
+
+/**
+ * POST /api/posts-flush：把攒批中的所有文章改动打包成 1 个 commit（N 篇 = 1 次构建）。
+ * Git Data API 四步：读 ref → 建 blob → 合树 → 提交 + 快进 ref；
+ * 全部仍走 api.github.com（白名单不变），ref 默认校验快进，不会覆盖别人的提交。
+ */
+async function handlePostsFlush() {
+  const kv = kvStore();
+  if (!kv) return fail('KV 未绑定，攒批功能不可用');
+  const pend = await kvReadPend(kv);
+  const slugs = Object.keys(pend).filter((s) => SLUG_RE.test(s));
+  if (!slugs.length) return json({ ok: true, committed: 0 });
+  if (slugs.length > 50) return fail('一次最多入库 50 篇，请分批处理');
+
+  const items = [];
+  for (const s of slugs) {
+    const raw = await kv.get(kvPostKey(s)).catch(() => null);
+    if (!raw) continue;
+    try {
+      const v = JSON.parse(raw);
+      items.push({
+        slug: s,
+        content: bytesToB64(enc.encode(serializeFrontmatter(normalizeMeta(v.meta), String(v.body || '')))),
+      });
+    } catch {
+      // 快照损坏的单篇跳过，不让整批失败
+    }
+  }
+  if (!items.length) {
+    await kvWritePend(kv, {});
+    return json({ ok: true, committed: 0 });
+  }
+
+  const ref = await ghFetch(repoSegments('git', 'ref', 'heads', CFG.branch()));
+  const baseSha = ref && ref.object && ref.object.sha;
+  if (!baseSha) return fail('读不到分支状态，请稍后重试');
+  const baseCommit = await ghFetch(repoSegments('git', 'commits', baseSha));
+  const entries = [];
+  for (const it of items) {
+    const blob = await ghFetch(repoSegments('git', 'blobs'), {
+      method: 'POST',
+      body: { content: it.content, encoding: 'base64' },
+    });
+    entries.push({ path: `${POSTS_DIR}/${it.slug}.md`, mode: '100644', type: 'blob', sha: blob.sha });
+  }
+  const tree = await ghFetch(repoSegments('git', 'trees'), {
+    method: 'POST',
+    body: { base_tree: baseCommit.tree.sha, tree: entries },
+  });
+  const commit = await ghFetch(repoSegments('git', 'commits'), {
+    method: 'POST',
+    body: { message: `CMS: 入库 ${items.length} 篇改动（攒批自动）`, tree: tree.sha, parents: [baseSha] },
+  });
+  try {
+    await ghFetch(repoSegments('git', 'refs', 'heads', CFG.branch()), {
+      method: 'PATCH',
+      body: { sha: commit.sha, force: false },
+    });
+  } catch (e) {
+    if (e.status === 422) return fail('刚才有其他改动先入库了，请重试一次入库', 409);
+    throw e;
+  }
+  for (const it of items) await kv.delete(kvPostKey(it.slug)).catch(() => {});
+  await kvWritePend(kv, {});
+  return json({ ok: true, committed: items.length, slugs: items.map((i) => i.slug) });
+}
 
 /** git ref 白名单：仅接受 commit sha（7-40 位十六进制），防任意 ref/分支注入 */
 const SHA_RE = /^[0-9a-f]{7,40}$/i;
@@ -919,4 +1146,7 @@ export {
   kvImageKey,
   kvImageName,
   imgContentType,
+  SLUG_RE,
+  kvPostKey,
+  mergePostsWithPending,
 };

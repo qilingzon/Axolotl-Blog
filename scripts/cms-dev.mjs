@@ -41,6 +41,8 @@ if (typeof mod.onRequest !== 'function') {
   process.exit(1);
 }
 const { kvImageKey, imgContentType, IMG_NAME_RE } = mod;
+// /p/ 出图/出文路由直接复用线上真实现（params + env 假装成 EdgeOne 上下文）
+const pRoute = await import(pathToFileURL(join(ROOT, 'edge-functions/p/[slug].js')).href);
 
 // KV 内存垫片：模拟 EdgeOne Pages 的 KV 绑定，让本地也能走「上传零构建」路径。
 // 默认开启——上传不落 GitHub（更快、不污染演示仓库），但重启即清空；
@@ -93,6 +95,23 @@ const MIME = {
 createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
+    // /p/<slug>：攒批文章路由（json 快照 / 预览页）——直接走线上 onRequestGet 真实现
+    if (url.pathname.startsWith('/p/')) {
+      const slug = decodeURIComponent(url.pathname.slice(3));
+      try {
+        const webRes = await pRoute.onRequestGet({
+          request: new Request(url.href),
+          params: { slug },
+          env,
+        });
+        res.writeHead(webRes.status, Object.fromEntries(webRes.headers));
+        res.end(Buffer.from(await webRes.arrayBuffer()));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('本地 /p/ 路由错误：' + (err && err.message));
+      }
+      return;
+    }
     // /m/<图片名>：KV 垫片出图（与线上 /m/[name].js 路由同约定）
     if (url.pathname.startsWith('/m/')) {
       let name = '';

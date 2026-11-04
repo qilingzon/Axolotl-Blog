@@ -22,6 +22,8 @@ const dateStr = pubDate.toLocaleDateString('zh-CN', {
   month: 'long',
   day: 'numeric',
 });
+// 构建时刻：探针脚本用它与 KV 里的保存时间比对，只有「保存晚于构建」才热替换
+const BUILD_TIME = Date.now();
 ---
 
 <BaseLayout title={title} description={description}>
@@ -69,6 +71,29 @@ const dateStr = pubDate.toLocaleDateString('zh-CN', {
       }
     </nav>
   </article>
+  <script is:inline define:vars={{ slug: post.id, builtAt: BUILD_TIME }}>
+    // KV 热替换探针：攒批保存的最新版晚于本页构建时刻时，原位换正文与标题。
+    // 探针是纯增强——KV 未绑/请求失败/版本不比构建新，页面都保持构建版原样
+    (function () {
+      try {
+        fetch('/p/' + encodeURIComponent(slug) + '?fmt=json')
+          .then(function (r) {
+            return r.ok ? r.json() : null;
+          })
+          .then(function (d) {
+            if (!d || !d.at || d.at <= builtAt || !d.html) return;
+            var bodyEl = document.querySelector('.post__body');
+            if (bodyEl) bodyEl.innerHTML = d.html;
+            var titleEl = document.querySelector('.post__title');
+            if (titleEl && d.title) {
+              titleEl.textContent = d.title;
+              document.title = d.title;
+            }
+          })
+          .catch(function () {});
+      } catch (e) {}
+    })();
+  </script>
 </BaseLayout>
 
 <style>

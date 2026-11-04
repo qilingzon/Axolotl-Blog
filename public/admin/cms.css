@@ -1185,6 +1185,93 @@ a.stat:hover {
   background: var(--surface-2);
 }
 
+/* 攒批横幅：仪表盘提示「N 篇改动还没入库」，可手动立即入库 */
+.flush-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 1px dashed var(--accent);
+  border-radius: 10px;
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+/* ⚙ 设置弹窗：模式三选 segmented + 阈值输入 */
+.seg {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 8px 0 10px;
+}
+
+.seg button {
+  padding: 7px 14px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.seg button.active {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+.settings-label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 6px 0 0;
+}
+
+.settings-desc {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin: 0 0 8px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 4px;
+}
+
+.settings-row label {
+  font-size: 13.5px;
+}
+
+.settings-row input {
+  width: 90px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font-display);
+}
+
+.settings-kvtip {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.settings-kvtip a {
+  color: var(--accent);
+}
+
 .ed-topbar__btn {
   padding: 5px 10px;
   font-family: var(--font-display);

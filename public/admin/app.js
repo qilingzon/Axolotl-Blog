@@ -68,6 +68,17 @@ function fmtSize(n) {
   return (n / 1024 / 1024).toFixed(1) + ' MB';
 }
 
+/** 时间戳 →「X 分钟/小时前」：攒批横幅显示最老一笔改动的年龄 */
+function fmtHoursOld(ms) {
+  if (!ms) return '刚刚';
+  var mins = Math.max(0, Math.round((Date.now() - ms) / 60000));
+  if (mins < 1) return '刚刚';
+  if (mins < 60) return mins + ' 分钟前';
+  var hours = Math.round(mins / 60);
+  if (hours < 24) return hours + ' 小时前';
+  return Math.round(hours / 24) + ' 天前';
+}
+
 function toast(msg, isErr) {
   var el = document.createElement('div');
   el.className = 'toast' + (isErr ? ' toast--err' : '');
@@ -239,6 +250,7 @@ var ENDPOINTS = {
   login: '/api/login',
   session: '/api/session',
   posts: '/api/posts',
+  'posts-flush': '/api/posts-flush',
   history: '/api/history',
   activity: '/api/activity',
   version: '/api/version',
@@ -387,6 +399,7 @@ function renderShell(active, contentHtml) {
     '</nav>' +
     '<button class="icon-btn" id="theme-btn" title="切换主题">' + esc((THEMES.find(function (t) { return t.id === themeNow; }) || THEMES[0]).label) + '</button>' +
     '<a class="icon-btn" href="/" target="_blank" rel="noopener">看博客</a>' +
+    '<button class="icon-btn" id="settings-btn" title="攒批入库设置">⚙</button>' +
     '<button class="icon-btn" id="help-btn" title="使用技巧速查">?</button>' +
     '<button class="icon-btn" id="logout-btn">退出</button>' +
     '</div></header>' +
@@ -394,6 +407,7 @@ function renderShell(active, contentHtml) {
   $('#logout-btn').addEventListener('click', function () {
     logout(true);
   });
+  $('#settings-btn').addEventListener('click', openSettingsModal);
   $('#help-btn').addEventListener('click', openHelpModal);
   $('#theme-btn').addEventListener('click', function () {
     var cur = document.documentElement.dataset.theme || 'pink-soft';
@@ -442,6 +456,127 @@ function openHelpModal() {
   document.addEventListener('keydown', onKey);
 }
 
+// ---------- 攒批入库：设置弹窗 + 打包入库 ----------
+
+var FLUSH_MODE_KEY = 'cms-flush-mode'; // batch=攒批（修改/草稿进 KV，新文章即时）| all=新文章也攒批 | immediate=每保存一次构建一次
+var FLUSH_COUNT_KEY = 'cms-flush-count'; // 攒批阈值（满 N 篇自动打包入库），默认 10
+
+function flushMode() {
+  var m = '';
+  try {
+    m = localStorage.getItem(FLUSH_MODE_KEY) || 'batch';
+  } catch (e) {}
+  return m === 'all' || m === 'immediate' ? m : 'batch';
+}
+
+function flushThreshold() {
+  var n = parseInt((function () {
+    try {
+      return localStorage.getItem(FLUSH_COUNT_KEY) || '10';
+    } catch (e) {
+      return '10';
+    }
+  })(), 10);
+  return n >= 1 && n <= 50 ? n : 10;
+}
+
+/** 打包入库：把攒批中的所有改动合成 1 个 commit（N 篇 = 1 次构建）；成功后文章缓存作废 */
+function flushPosts(silent) {
+  return api('POST', 'posts-flush')
+    .then(function (res) {
+      state.postsCache = null;
+      if (res && res.committed) {
+        toast('已入库 ' + res.committed + ' 篇改动（1 次构建，约 1 分钟后全部生效）');
+      } else if (!silent) {
+        toast('没有攒批中的改动，一切都在库里');
+      }
+      return res;
+    })
+    .catch(function (err) {
+      if (!silent) toast(err.message, true);
+      return null;
+    });
+}
+
+/** ⚙ 设置弹窗：攒批模式三选 + 阈值 + 立即入库 */
+function openSettingsModal() {
+  var kvOk = !!state.kvAvailable;
+  var mask = document.createElement('div');
+  mask.className = 'modal-mask';
+  mask.innerHTML =
+    '<div class="modal settings"><h3>攒批入库设置</h3>' +
+    (kvOk
+      ? ''
+      : '<p class="settings-kvtip">⚠ 还没绑定 KV 存储：攒批功能用不了，保存仍会立即入库构建。绑定方法见 <a href="/admin/setup.html" target="_blank" rel="noopener">部署助手第⑥步</a>。</p>') +
+    '<p class="settings-label">保存模式</p>' +
+    '<div class="seg" id="flush-mode">' +
+    '<button type="button" data-m="batch">攒批（推荐）</button>' +
+    '<button type="button" data-m="all">全攒</button>' +
+    '<button type="button" data-m="immediate">即时入库</button>' +
+    '</div>' +
+    '<p class="settings-desc" id="flush-desc"></p>' +
+    '<div class="settings-row"><label>攒多少篇自动入库</label><input id="flush-count" type="number" min="1" max="50" step="1"></div>' +
+    '<p class="settings-desc">入库 = 把攒下的改动打包成 1 个提交，只触发 1 次构建；之后随时可手动入库，超 24 小时也会自动入库，不怕丢。</p>' +
+    '<div class="modal__actions">' +
+    '<button class="btn btn--ghost" data-act="flush">立即入库</button>' +
+    '<span class="spacer"></span>' +
+    '<button class="btn" data-act="save">保存设置</button>' +
+    '</div></div>';
+  document.body.appendChild(mask);
+  var modeBox = $('#flush-mode');
+  var descEl = $('#flush-desc');
+  var countInput = $('#flush-count');
+  var mode = flushMode();
+  countInput.value = flushThreshold();
+  var DESCS = {
+    batch: '改文章和存草稿先存在 KV（访客立刻看到新版、不触发构建），攒够篇数自动入库；发布新文章仍即时入库（新页面要构建才存在）。',
+    all: '新文章也先进 KV 攒批（构建次数最少）：新文章要等入库构建后才会出现在博客上。',
+    immediate: '每次保存直接入库构建（与旧版行为一致）。',
+  };
+  function paintMode() {
+    modeBox.querySelectorAll('button').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.m === mode);
+    });
+    descEl.textContent = DESCS[mode];
+  }
+  paintMode();
+  modeBox.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-m]');
+    if (!b) return;
+    mode = b.dataset.m;
+    paintMode();
+  });
+  function close() {
+    document.removeEventListener('keydown', onKey);
+    mask.remove();
+  }
+  function onKey(e) {
+    if (e.key === 'Escape' && document.querySelectorAll('.modal-mask').length <= 1) close();
+  }
+  mask.addEventListener('click', function (e) {
+    var act = e.target.getAttribute && e.target.getAttribute('data-act');
+    if (act === 'save') {
+      var n = parseInt(countInput.value, 10);
+      if (!(n >= 1 && n <= 50)) {
+        toast('篇数填 1–50 之间的整数', true);
+        return;
+      }
+      try {
+        localStorage.setItem(FLUSH_MODE_KEY, mode);
+        localStorage.setItem(FLUSH_COUNT_KEY, String(n));
+      } catch (err) {}
+      toast('设置已保存：' + (mode === 'batch' ? '攒批' : mode === 'all' ? '全攒' : '即时') + ' · 满 ' + n + ' 篇自动入库');
+      close();
+    } else if (act === 'flush') {
+      flushPosts(false);
+      close();
+    } else if (e.target === mask) {
+      close();
+    }
+  });
+  document.addEventListener('keydown', onKey);
+}
+
 // ---------- 登录视图 ----------
 
 function renderLogin() {
@@ -475,6 +610,7 @@ function renderLogin() {
         state.token = data.token;
         state.expiresAt = data.expiresAt;
         state.user = userInput || 'admin'; // 登录响应不含用户名，用表单输入值，别再显示 admin
+        state.kvAvailable = !!data.kv; // 攒批功能可用性：登录时就拿到，保存流不用再猜
         localStorage.setItem('cms-token', data.token);
         localStorage.setItem('cms-expires', String(data.expiresAt));
         localStorage.setItem('cms-user', state.user);
@@ -570,6 +706,13 @@ function renderDashboard() {
         var html =
           '<div class="page-head"><h1>仪表盘</h1><span class="spacer"></span>' +
           '<a class="btn" href="#/editor/new">写新文章</a></div>' +
+          (data.pending
+            ? '<div class="flush-banner"><span>📦 有 ' +
+              data.pending +
+              ' 篇改动还没入库（最老 ' +
+              fmtHoursOld(data.pendingOldest) +
+              '）——访客已能看到最新版，入库后站点构建一次全部落定</span><button type="button" class="btn btn--sm" id="flush-now">立即入库</button></div>'
+            : '') +
           '<div class="stats">' +
           statCard(posts.length, '篇文章', '/assets/axolotl-cyan.png', '#/posts', '看全部文章') +
           statCard(Object.keys(tags).length, '个标签', '/assets/axolotl-gold.png', '#/tags', '看标签总览') +
@@ -585,6 +728,17 @@ function renderDashboard() {
           actHtml +
           '</div>';
         renderShell('dashboard', html);
+        // 攒批横幅按钮：点了立刻打包入库（不关横幅，计数下次进仪表盘刷新）
+        var flushBtn = $('#flush-now');
+        if (flushBtn) {
+          flushBtn.addEventListener('click', function () {
+            flushPosts(false);
+          });
+        }
+        // 惰性自动入库：最老一笔改动超过 24 小时就顺手打包，防止一直忘了入库
+        if (data.pending && data.pendingOldest && Date.now() - data.pendingOldest > 24 * 60 * 60 * 1000) {
+          flushPosts(true);
+        }
       });
     })
     .catch(function (err) {
@@ -630,8 +784,8 @@ function postRowHtml(p, kw) {
     '<span>' + (p.tags || []).map(function (t) { return '<span class="tag-chip">' + esc(t) + '</span>'; }).join(' ') +
     (imgCount ? '<span class="tag-chip tag-chip--imgs" title="正文里有 ' + imgCount + ' 张图">' + imgCount + ' 图</span>' : '') + '</span></div>' +
     snippet + '</div>' +
-    // 草稿前台 404，「链」指向只有自己知道链接的预览页；已发布才给 /blog/ 链接
-    '<span class="row-link-btn" data-copylink="' + (p.draft ? '/preview/' : '/blog/') + encodeURIComponent(p.slug) + '/" title="' + (p.draft ? '复制预览页链接（草稿没有前台页）' : '复制前台文章链接') + '">链</span>' +
+    // 草稿前台 404，「链」指向预览页；攒批未入库的用 /p/ KV 预览页（正式页要等入库构建）
+    '<span class="row-link-btn" data-copylink="' + (p.pending ? '/p/' : p.draft ? '/preview/' : '/blog/') + encodeURIComponent(p.slug) + '/" title="' + (p.pending ? '复制攒批预览链接（这篇的最新版还没入库）' : p.draft ? '复制预览页链接（草稿没有前台页）' : '复制前台文章链接') + '">链</span>' +
     '<span class="save-state">编辑 →</span></a>'
   );
 }
@@ -1856,9 +2010,11 @@ function renderEditor(slug) {
         '<div class="page-head"><h1>' + (isNew ? '写新文章' : '编辑文章') + '</h1><span class="spacer"></span>' +
         (isNew
           ? ''
-          : post && post.draft
-            ? '<a class="btn btn--ghost" id="view-live-btn" href="/preview/' + encodeURIComponent(slug) + '/" target="_blank" rel="noopener" title="草稿不进前台，这是只有你知道链接的预览页">预览草稿页</a>'
-            : '<a class="btn btn--ghost" id="view-live-btn" href="/blog/' + encodeURIComponent(slug) + '/" target="_blank" rel="noopener">看线上页面</a>') +
+          : post && post.pending
+            ? '<a class="btn btn--ghost" id="view-live-btn" href="/p/' + encodeURIComponent(slug) + '/" target="_blank" rel="noopener" title="这篇的最新版还没入库——这是 KV 里的即时预览页，入库构建后才有正式页">看攒批预览</a>'
+            : post && post.draft
+              ? '<a class="btn btn--ghost" id="view-live-btn" href="/preview/' + encodeURIComponent(slug) + '/" target="_blank" rel="noopener" title="草稿不进前台，这是只有你知道链接的预览页">预览草稿页</a>'
+              : '<a class="btn btn--ghost" id="view-live-btn" href="/blog/' + encodeURIComponent(slug) + '/" target="_blank" rel="noopener">看线上页面</a>') +
         '</div>' +
         '<div class="editor-grid">' +
         '<div class="card">' +
@@ -2352,11 +2508,15 @@ function bindEditor(origSlug, post) {
     }
     var btn = this;
     btn.disabled = true;
-    $('#save-state').textContent = '正在提交到 GitHub……';
+    var kvMode = !!state.kvAvailable && flushMode() !== 'immediate';
+    $('#save-state').textContent = kvMode ? '正在保存……' : '正在提交到 GitHub……';
     api('PUT', 'posts', {
       slug: slug,
       body: {
-        oldSlug: isNew ? '' : origSlug, // 恒传原 slug：服务端靠 oldSlug===slug 区分「改自己」与「撞别人」
+        oldSlug: isNew ? '' : origSlug, // 恒传原 slug：服务端真实存在与否说了算，oldSlug 只用于改名/撞名判断
+        saveMode: flushMode(), // 攒批模式只影响存储走向；未绑 KV 时服务端自动走即时入库
+        // 渲染快照只要不是「即时」模式就带上（服务端只在 KV 攒批路径读它；渲染失败的兜底见服务端）
+        html: flushMode() !== 'immediate' ? renderMarkdown(currentBody()) : '',
         post: {
           title: $('#f-title').value.trim(),
           description: $('#f-desc').value.trim(),
@@ -2378,6 +2538,15 @@ function bindEditor(origSlug, post) {
         } catch (e) {}
         if (data && data.warn) {
           toast(data.warn, true); // 改名的旧文件删除失败：新文章已保存，提醒手动清理
+        } else if (data && data.kv && typeof data.pending === 'number') {
+          // 攒批路径：改动进了 KV，访客已能看到最新版；满阈值自动打包入库
+          var threshold = flushThreshold();
+          toast('已保存（攒批 ' + data.pending + ' 篇，访客已可见最新版）');
+          if (data.pending >= threshold) {
+            setTimeout(function () {
+              flushPosts(true);
+            }, 600);
+          }
         } else {
           toast('已保存，站点构建约需一分钟');
         }
@@ -2434,14 +2603,14 @@ function bindEditor(origSlug, post) {
         confirmModal('删除文章', tip, '删除').then(function (yes) {
           if (!yes) return;
           api('DELETE', 'posts', { slug: origSlug })
-            .then(function () {
+            .then(function (data) {
               editorGuard = null; // 删除成功后的跳转不拦截
               // 删的就是「上次编辑」那篇的话，把入口一并清掉，别让仪表盘指去 404
               try {
                 var last = JSON.parse(localStorage.getItem(LAST_EDIT_KEY) || 'null');
                 if (last && last.slug === origSlug) localStorage.removeItem(LAST_EDIT_KEY);
               } catch (e) {}
-              toast('已删除');
+              toast(data && data.kvOnly ? '已删除（这篇还没入库过，不触发构建）' : '已删除');
               location.hash = '#/posts';
             })
             .catch(function (err) {
@@ -3258,6 +3427,8 @@ if (loggedIn()) {
         state.user = data.user;
         localStorage.setItem('cms-user', state.user);
       }
+      // KV 绑定状态给设置弹窗用（服务端只报有无，前端不猜）
+      state.kvAvailable = !!data.kv;
       if (data.token && data.expiresAt) {
         state.token = data.token;
         state.expiresAt = data.expiresAt;

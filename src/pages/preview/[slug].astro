@@ -18,6 +18,8 @@ const dateStr = pubDate.toLocaleDateString('zh-CN', {
   month: 'long',
   day: 'numeric',
 });
+// 构建时刻：探针用它与 KV 保存时间比对（与 blog/[slug] 同机制）
+const BUILD_TIME = Date.now();
 ---
 
 <BaseLayout title={title} description={description} noindex>
@@ -49,6 +51,28 @@ const dateStr = pubDate.toLocaleDateString('zh-CN', {
       <Content />
     </div>
   </article>
+  <script is:inline define:vars={{ slug: post.id, builtAt: BUILD_TIME }}>
+    // KV 热替换探针（与 blog/[slug] 同机制）：攒批保存的草稿新版晚于构建时刻时原位替换
+    (function () {
+      try {
+        fetch('/p/' + encodeURIComponent(slug) + '?fmt=json')
+          .then(function (r) {
+            return r.ok ? r.json() : null;
+          })
+          .then(function (d) {
+            if (!d || !d.at || d.at <= builtAt || !d.html) return;
+            var bodyEl = document.querySelector('.post__body');
+            if (bodyEl) bodyEl.innerHTML = d.html;
+            var titleEl = document.querySelector('.post__title');
+            if (titleEl && d.title) {
+              titleEl.textContent = d.title;
+              document.title = d.title;
+            }
+          })
+          .catch(function () {});
+      } catch (e) {}
+    })();
+  </script>
 </BaseLayout>
 
 <style>
