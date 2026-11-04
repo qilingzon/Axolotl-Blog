@@ -694,6 +694,14 @@ a.stat:hover {
   font-size: 14.5px;
 }
 
+/* 编辑器预览里 404 的图（站点还没构建完）：变暗 + 虚线框，悬停有说明文字（JS 加 title） */
+.md-body img.img-build-pending {
+  opacity: 0.25;
+  outline: 1px dashed var(--border);
+  min-height: 60px;
+  object-fit: contain;
+}
+
 .md-body h2 {
   font-size: 1.3em;
   margin: 1.2em 0 0.4em;
@@ -868,6 +876,22 @@ a.stat:hover {
   background: var(--surface-2);
 }
 
+/* 站点还没构建完时仓库路径的图 404：图变暗 + 盖"构建中"字样，70 秒后由 JS 自动重试一次 */
+.media-item--pending img {
+  opacity: 0.2;
+}
+
+.media-item--pending::after {
+  content: '构建中，稍后自动重试';
+  position: absolute;
+  top: 44px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
 .media-item__bar {
   display: flex;
   gap: 6px;
@@ -893,6 +917,7 @@ a.stat:hover {
 
 .media-item__ops {
   display: flex;
+  flex-wrap: wrap; /* 窄卡片放不下 4 个按钮时换行，绝不溢出被裁（卡片 overflow:hidden） */
   gap: 6px;
   padding: 0 8px 8px;
 }

@@ -250,6 +250,8 @@ var SLUG_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,80}$/;
 var WORD_GOAL_KEY = 'cms-word-goal'; // 写作小目标：目标字数存 localStorage，跨会话记住
 var LAST_EDIT_KEY = 'cms-last-edit'; // 继续上次编辑：最近保存的文章 {slug, title, at}，仪表盘给个直达入口
 var freshUploads = []; // 本轮刚上传成功的图片名：媒体库渲染时高亮几秒，批量上传后一眼看到新图
+var freshData = {}; // 刚上传图片的本地预览源（dataURL）：仓库路径的图要等站点构建后才能访问，先用前端手里那份显示
+var compressSeq = 0; // 同一毫秒压缩多张时给文件名时间戳加序号，避免撞名
 
 function api(method, endpoint, opts) {
   opts = opts || {};
@@ -2347,8 +2349,13 @@ function bindEditor(origSlug, post) {
   if (!isNew) {
     $('#del-btn').addEventListener('click', function () {
       // 孤儿图片提示：删除后仅被本文引用的图会失去唯一引用——算出来放进确认弹窗，纯提示不拦操作
+      // 两种引用形态都提取：仓库老图 /assets/uploads/，KV 新图 /m/
       var refNames = [];
       String(post.body || '').replace(/\/assets\/uploads\/([0-9A-Za-z._-]+)/g, function (_, n) {
+        refNames.push(n);
+        return '';
+      });
+      String(post.body || '').replace(/\/m\/([0-9A-Za-z._-]+)/g, function (_, n) {
         refNames.push(n);
         return '';
       });
@@ -2368,7 +2375,9 @@ function bindEditor(origSlug, post) {
         if (list && refNames.length) {
           orphans = refNames.filter(function (n) {
             return !list.some(function (p) {
-              return p.slug !== origSlug && String(p.body || '').indexOf('/assets/uploads/' + n) !== -1;
+              if (p.slug === origSlug) return false;
+              var body = String(p.body || '');
+              return body.indexOf('/assets/uploads/' + n) !== -1 || body.indexOf('/m/' + n) !== -1;
             });
           });
         }
@@ -2432,9 +2441,12 @@ function renderMedia() {
       if (list && list.map) {
         refsMap = {};
         images.forEach(function (im) {
-          var needle = '/assets/uploads/' + im.name;
           refsMap[im.name] = list.filter(function (p) {
-            return String(p.body || '').indexOf(needle) !== -1;
+            var body = String(p.body || '');
+            // 两种引用形态都算：仓库老图 /assets/uploads/，KV 新图 /m/
+            return (
+              body.indexOf('/assets/uploads/' + im.name) !== -1 || body.indexOf('/m/' + im.name) !== -1
+            );
           });
         });
       }
@@ -2463,9 +2475,11 @@ function renderMedia() {
           ? '<div class="media-grid">' +
               list
                 .map(function (im) {
+                  // 刚上传的图用前端手里的压缩结果直接显示：仓库路径的图要等站点构建完成才能访问
+                  var src = freshData[im.name] || im.url;
                   return (
                     '<div class="media-item' + (freshUploads.indexOf(im.name) !== -1 ? ' media-item--fresh' : '') + '"><label class="media-item__pick" title="勾选批量删除"><input type="checkbox" data-pick="' + esc(im.name) + '"><span class="media-item__pickbox"></span></label>' +
-                    '<img src="' + esc(im.url) + '" alt="" loading="lazy">' +
+                    '<img src="' + esc(src) + '" alt="" loading="lazy">' +
                     '<div class="media-item__bar"><span class="media-item__name" title="' + esc(im.name) + '">' +
                     highlightName(im.name, kw) + '（' + fmtSize(im.size) + '）</span>' +
                     '<span class="media-item__dims"></span></div>' +
@@ -2489,7 +2503,8 @@ function renderMedia() {
             (images.length ? '没有匹配的图片' : '还没有图片，拖一张上来试试') + '</div>';
       }
 
-      // 图片加载完成后显示原始尺寸（缓存图 load 事件可能已错过，complete 的直接量）
+      // 图片加载完成后显示原始尺寸（缓存图 load 事件可能已错过，complete 的直接量）；
+      // 顺带接管加载失败：仓库路径的图在站点重新构建完成前会 404——盖"构建中"占位，70 秒后自动重试一次
       function attachDims(root) {
         root.querySelectorAll('.media-item img').forEach(function (img) {
           var dims = img.parentElement.querySelector('.media-item__dims');
@@ -2498,12 +2513,33 @@ function renderMedia() {
           }
           img.addEventListener('load', show);
           if (img.complete) show();
+          function onErr() {
+            if (img.dataset.retried || String(img.src || '').indexOf('data:') === 0) return;
+            img.dataset.retried = '1';
+            var card = img.closest('.media-item');
+            if (!card) return;
+            card.classList.add('media-item--pending');
+            setTimeout(function () {
+              card.classList.remove('media-item--pending');
+              img.src = img.src + (img.src.indexOf('?') === -1 ? '?' : '&') + 'r=' + Date.now();
+            }, 70000);
+          }
+          img.addEventListener('error', onErr);
+          // 渲染前就已失败（complete 且无尺寸）：error 事件错过了，手动补一发
+          if (img.complete && !img.naturalWidth) onErr();
         });
       }
 
       var html =
         '<div class="page-head"><h1>媒体库</h1><span style="color:var(--text-muted);font-size:14px">' +
-        images.length + ' 张图片 · 上传自动压缩</span>' +
+        images.length + ' 张图片 · 上传自动压缩' +
+        (both.data.kv
+          ? '<span title="图片存在 KV 存储，上传后立刻可访问，站点不用重新构建"> · KV 零构建已启用</span>'
+          : '') +
+        (both.data.repoError
+          ? '<span title="GitHub 暂时读不到，仓库里的旧图暂时不显示，稍后刷新即可恢复"> · 仓库图暂时读不到</span>'
+          : '') +
+        '</span>' +
         (images.length > 3
           ? '<span class="spacer"></span><input class="search-input" id="media-search" placeholder="搜文件名…">' +
             '<select id="media-type" style="width:110px"><option value="">全部类型</option>' +
@@ -2542,9 +2578,18 @@ function renderMedia() {
         // 点缩略图放大查看（Esc/点击任意处关闭）
         var img = e.target.closest('.media-item img');
         if (img) {
+          // data: 是刚上传图的前端压缩结果（本会话内自己生成，可信）
+          if (String(img.src || '').indexOf('data:image/') === 0) {
+            openLightbox(img.src);
+            return;
+          }
           // 只放行上传目录内的相对路径（防御纵深：名字服务端白名单 + 这里路径前缀校验，杜绝任意 src 注入）
           var u = new URL(img.src, location.href);
-          if (u.origin === location.origin && u.pathname.indexOf('/assets/uploads/') === 0) openLightbox(u.pathname);
+          if (
+            u.origin === location.origin &&
+            (u.pathname.indexOf('/assets/uploads/') === 0 || u.pathname.indexOf('/m/') === 0)
+          )
+            openLightbox(u.pathname);
         }
       });
       var searchEl = $('#media-search');
@@ -3066,8 +3111,8 @@ function compressImage(file) {
           .replace(/[^0-9A-Za-z_-]+/g, '-') // 后端文件名白名单仅 ASCII，含中文会被整名拒收
           .replace(/^-+|-+$/g, '')
           .slice(0, 60) || 'image';
-      var stamp = Date.now().toString(36);
-      resolve({ name: base + '-' + stamp + '.' + ext, data: dataUrl.split(',')[1] });
+      var stamp = Date.now().toString(36) + (++compressSeq).toString(36);
+      resolve({ name: base + '-' + stamp + '.' + ext, data: dataUrl.split(',')[1], dataUrl: dataUrl });
     };
     img.onerror = function () {
       URL.revokeObjectURL(url);
@@ -3077,13 +3122,27 @@ function compressImage(file) {
   });
 }
 
+/** 记住刚上传图片的本地预览源；超过 12 张丢最旧的（dataURL 每张最多 ~1.3MB 字符，不能无上限堆积） */
+function rememberFresh(name, dataUrl) {
+  var keys = Object.keys(freshData);
+  if (keys.length >= 12) delete freshData[keys[0]];
+  freshData[name] = dataUrl;
+}
+
 /** 压缩并上传一张图片，返回 Promise<{name, url}>；媒体库、块编辑器、图片选择器共用 */
 function uploadImageFile(file) {
   return compressImage(file)
     .then(function (img) {
-      return api('POST', 'media', { body: img }).then(function (res) {
+      // body 只带 name/data：dataUrl 是本地预览用的大字符串，塞进请求体会撞 1MB 上限
+      return api('POST', 'media', { body: { name: img.name, data: img.data } }).then(function (res) {
         freshUploads.push(img.name);
-        return { name: img.name, url: '/assets/uploads/' + img.name, overwritten: !!(res && res.overwritten) };
+        rememberFresh(img.name, img.dataUrl);
+        // url 以服务端返回为准：KV 路径是 /m/<名>，仓库路径是 /assets/uploads/<名>
+        return {
+          name: img.name,
+          url: (res && res.url) || '/assets/uploads/' + img.name,
+          overwritten: !!(res && res.overwritten),
+        };
       });
     });
 }
@@ -3120,6 +3179,20 @@ function uploadFiles(files) {
 
 app = $('#app');
 bindMediaDelegates();
+// 编辑器预览里的图片在站点重新构建完成前会 404：盖半透明+虚线并写明原因，构建完成后刷新即恢复。
+// img 的 error 事件不冒泡，用捕获阶段在 document 上接住；只标记样式不改 URL，不干扰预览渲染
+document.addEventListener(
+  'error',
+  function (e) {
+    var t = e.target;
+    if (!t || t.tagName !== 'IMG' || String(t.src || '').indexOf('data:') === 0) return;
+    if (!t.closest || !t.closest('.md-body') || t.dataset.buildPending) return;
+    t.dataset.buildPending = '1';
+    t.classList.add('img-build-pending');
+    t.title = '图片已上传，等站点重新构建（约 1 分钟）后就能正常显示';
+  },
+  true
+);
 // 快捷键 N：未聚焦输入框、无弹窗时按 N 直接写新文章（登录后生效）
 document.addEventListener('keydown', function (e) {
   if (e.key !== 'n' && e.key !== 'N') return;

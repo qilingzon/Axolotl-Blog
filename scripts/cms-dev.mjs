@@ -40,6 +40,40 @@ if (typeof mod.onRequest !== 'function') {
   console.error('未找到 onRequest 导出');
   process.exit(1);
 }
+const { kvImageKey, imgContentType, IMG_NAME_RE } = mod;
+
+// KV 内存垫片：模拟 EdgeOne Pages 的 KV 绑定，让本地也能走「上传零构建」路径。
+// 默认开启——上传不落 GitHub（更快、不污染演示仓库），但重启即清空；
+// 要测老的「提交到仓库」路径时设 CMS_KV_SHIM=0。
+function makeKvShim() {
+  const store = new Map();
+  return {
+    async put(key, value) {
+      store.set(key, value instanceof ArrayBuffer ? new Uint8Array(value) : value);
+    },
+    async get(key, opts = {}) {
+      const v = store.get(key);
+      if (v === undefined) return null;
+      if ((opts.type || 'text') === 'arrayBuffer') return v instanceof Uint8Array ? v.slice().buffer : v;
+      return v instanceof Uint8Array ? new TextDecoder().decode(v) : String(v);
+    },
+    async delete(key) {
+      store.delete(key);
+    },
+    async list({ prefix = '', limit = 256, cursor } = {}) {
+      const all = [...store.keys()].filter((k) => k.startsWith(prefix)).sort();
+      const start = cursor ? all.indexOf(cursor) + 1 : 0;
+      const page = all.slice(start, start + limit);
+      const next = start + limit;
+      return {
+        keys: page.map((name) => ({ name })),
+        complete: next >= all.length,
+        cursor: next < all.length ? page[page.length - 1] : null,
+      };
+    },
+  };
+}
+if (process.env.CMS_KV_SHIM !== '0') env.CMS_KV = makeKvShim();
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -59,6 +93,29 @@ const MIME = {
 createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
+    // /m/<图片名>：KV 垫片出图（与线上 /m/[name].js 路由同约定）
+    if (url.pathname.startsWith('/m/')) {
+      let name = '';
+      try {
+        name = decodeURIComponent(url.pathname.slice(3));
+      } catch {
+        name = '';
+      }
+      if (!IMG_NAME_RE.test(name) || !env.CMS_KV) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('图片不存在（KV 垫片未开启时 CMS_KV_SHIM=0 走仓库路径）');
+        return;
+      }
+      const bytes = await env.CMS_KV.get(kvImageKey(name), { type: 'arrayBuffer' });
+      if (!bytes) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('图片不存在（KV 垫片重启后会清空）');
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': imgContentType(name), 'Cache-Control': 'no-store' });
+      res.end(Buffer.from(bytes));
+      return;
+    }
     // API：交给边缘函数处理器
     if (url.pathname.startsWith('/api/')) {
       const body = ['GET', 'HEAD'].includes(req.method)

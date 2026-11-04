@@ -649,20 +649,123 @@ async function handleVersionRestore(slug, request) {
 
 const IMG_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,100}\.(png|jpe?g|webp|gif|avif)$/i;
 
+/**
+ * KV 存储接入（零构建上传的核心）：图片字节存 EdgeOne Pages KV 命名空间，不走 git、
+ * 不触发站点构建，上传后立刻可以通过 /m/<图片名> 访问。
+ * 绑定方式：EdgeOne 控制台 → 项目 → KV 存储 → 绑定命名空间，变量名填 CMS_KV；
+ * 绑定以全局变量形式注入运行时（与文档示例的裸变量一致），未绑定时这里是 null，
+ * 所有上传/删除/改名自动降级回 GitHub 提交路径——行为与历史版本完全一致。
+ */
+function kvStore() {
+  if (CTX_ENV && CTX_ENV.CMS_KV) return CTX_ENV.CMS_KV;
+  if (typeof globalThis.CMS_KV !== 'undefined') return globalThis.CMS_KV;
+  return null;
+}
+
+/** KV key 只允许字母/数字/下划线（官方文档限制），图片名含 . 和 - → 十六进制编码，可逆 */
+function kvImageKey(name) {
+  const bytes = enc.encode(name);
+  let hex = '';
+  for (const b of bytes) hex += b.toString(16).padStart(2, '0');
+  return 'u_' + hex;
+}
+
+function kvImageName(key) {
+  const hex = key.slice(2);
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+  return dec.decode(bytes);
+}
+
+function imgContentType(name) {
+  const m = name.match(/\.([a-z0-9]+)$/i);
+  const ext = m && m[1] ? m[1].toLowerCase() : '';
+  return (
+    {
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      webp: 'image/webp',
+      gif: 'image/gif',
+      avif: 'image/avif',
+    }[ext] || 'application/octet-stream'
+  );
+}
+
+const KV_INDEX_KEY = 'idx';
+
+/** 读图片索引（名→{name,size,at}）；索引丢失时从 u_ 前缀 key 重建（size 补 0，下次上传修复） */
+async function kvReadIndex(kv) {
+  try {
+    const raw = await kv.get(KV_INDEX_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') return parsed;
+    }
+  } catch {
+    // 索引坏了不挡路：落空对象后按 key 重建
+  }
+  const idx = {};
+  try {
+    let cursor;
+    for (;;) {
+      const page = await kv.list({ prefix: 'u_', cursor });
+      for (const k of page.keys || []) {
+        const name = kvImageName(k.name);
+        if (IMG_NAME_RE.test(name)) idx[name] = { name, size: 0, at: 0 };
+      }
+      if (!page.cursor) break;
+      cursor = page.cursor;
+    }
+  } catch {
+    // KV 整体不可用时返回空索引，上层照常走仓库路径
+  }
+  return idx;
+}
+
+async function kvWriteIndex(kv, idx) {
+  await kv.put(KV_INDEX_KEY, JSON.stringify(idx));
+}
+
+/** KV 里的全部图片（列表用）；KV 未绑定/不可用 → 空数组 */
+async function kvListImages() {
+  const kv = kvStore();
+  if (!kv) return [];
+  const idx = await kvReadIndex(kv);
+  return Object.keys(idx)
+    .filter((n) => IMG_NAME_RE.test(n))
+    .map((n) => ({ name: n, sha: '', size: idx[n].size || 0, url: `/m/${n}`, src: 'kv' }));
+}
+
+/** 文章正文里引用某张图（新旧两种 URL 形态都算） */
+function postRefsImage(body, name) {
+  const text = String(body || '');
+  return text.indexOf('/assets/uploads/' + name) !== -1 || text.indexOf('/m/' + name) !== -1;
+}
+
 async function handleListMedia() {
+  // KV 图排前面（新上传），同名时 KV 覆盖仓库条目
+  const kvImages = await kvListImages().catch(() => []);
   const files = await ghFetch(repoSegments('contents', MEDIA_DIR)).catch((e) => {
     if (e.status === 404) return []; // 目录还没创建过 = 空库
+    // GitHub 半边挂了（限流/网络/令牌）：只要还有 KV 图可展示就不让整页 500，前端提示仓库图暂缺
+    if (kvStore() && kvImages.length) return null;
     throw e;
   });
-  const images = files
-    .filter((f) => f.type === 'file' && IMG_NAME_RE.test(f.name))
-    .map((f) => ({
-      name: f.name,
-      sha: f.sha,
-      size: f.size,
-      url: `/assets/uploads/${f.name}`,
-    }));
-  return json({ images });
+  const repoImages = files
+    ? files
+        .filter((f) => f.type === 'file' && IMG_NAME_RE.test(f.name))
+        .map((f) => ({
+          name: f.name,
+          sha: f.sha,
+          size: f.size,
+          url: `/assets/uploads/${f.name}`,
+          src: 'repo',
+        }))
+    : [];
+  const kvNames = new Set(kvImages.map((i) => i.name));
+  const images = [...kvImages, ...repoImages.filter((i) => !kvNames.has(i.name))];
+  return json({ images, kv: !!kvStore(), ...(files === null ? { repoError: true } : {}) });
 }
 
 async function handleUploadMedia(request) {
@@ -671,6 +774,17 @@ async function handleUploadMedia(request) {
   if (!IMG_NAME_RE.test(name)) return fail('文件名不合法（仅支持 png/jpg/webp/gif/avif）');
   const data = String(input.data || '');
   if (!data) return fail('缺少图片数据');
+  const kv = kvStore();
+  if (kv) {
+    // 零构建路径：字节进 KV，不走 git，站点不用重新构建
+    const bytes = b64ToBytes(data);
+    const idx = await kvReadIndex(kv);
+    const overwritten = !!idx[name];
+    await kv.put(kvImageKey(name), bytes);
+    idx[name] = { name, size: bytes.byteLength, at: Date.now() };
+    await kvWriteIndex(kv, idx);
+    return json({ ok: true, name, url: `/m/${name}`, kv: true, overwritten });
+  }
   const filePath = `${MEDIA_DIR}/${name}`;
   const existing = await ghFetch(repoSegments('contents', filePath)).catch((e) => {
     if (e.status === 404) return null;
@@ -709,7 +823,7 @@ async function handleRenameMedia(request, url) {
   const toPath = `${MEDIA_DIR}/${to}`;
 
   const posts = await fetchAllPosts();
-  const refs = posts.filter((p) => String(p.body || '').indexOf('/assets/uploads/' + from) !== -1);
+  const refs = posts.filter((p) => postRefsImage(p.body, from));
   if (refs.length) {
     return fail(
       `有 ${refs.length} 篇文章正在引用它（${refs
@@ -717,6 +831,22 @@ async function handleRenameMedia(request, url) {
         .join('、')}），重命名会让它们裂图；请先在文章里换成新图再删除`,
       409
     );
+  }
+
+  // KV 分支：图片在 KV 里（零构建上传的）→ 值拷到新 key、删旧 key、改索引，全程不碰 git
+  const kv = kvStore();
+  const kvBytes = kv ? await kv.get(kvImageKey(from), { type: 'arrayBuffer' }).catch(() => null) : null;
+  if (kv && kvBytes) {
+    const clash = await kv.get(kvImageKey(to)).catch(() => null);
+    if (clash !== null) return fail('已有同名图片，请换一个名字', 409);
+    await kv.put(kvImageKey(to), kvBytes);
+    await kv.delete(kvImageKey(from));
+    const idx = await kvReadIndex(kv);
+    const meta = idx[from] || {};
+    delete idx[from];
+    idx[to] = { name: to, size: meta.size || 0, at: meta.at || Date.now() };
+    await kvWriteIndex(kv, idx);
+    return json({ ok: true, name: to, url: '/m/' + to, kv: true });
   }
 
   const old = await ghFetch(repoSegments('contents', fromPath)).catch((e) => {
@@ -751,6 +881,19 @@ async function handleRenameMedia(request, url) {
 async function handleDeleteMedia(url) {
   const name = url.searchParams.get('name') || '';
   if (!IMG_NAME_RE.test(name)) return fail('文件名不合法');
+  // KV 分支：图片存 KV 的话直接删 KV + 更新索引；不在这里 → 掉到仓库路径删老图
+  const kv = kvStore();
+  if (kv) {
+    const key = kvImageKey(name);
+    const exists = await kv.get(key).catch(() => null);
+    if (exists !== null) {
+      await kv.delete(key);
+      const idx = await kvReadIndex(kv);
+      delete idx[name];
+      await kvWriteIndex(kv, idx);
+      return json({ ok: true });
+    }
+  }
   const filePath = `${MEDIA_DIR}/${name}`;
   const item = await ghFetch(repoSegments('contents', filePath)).catch((e) => {
     if (e.status === 404) {
@@ -766,4 +909,14 @@ async function handleDeleteMedia(url) {
 }
 
 // ---------- 仅供测试的纯函数导出（EdgeOne 只认 onRequest，多出的具名导出无副作用） ----------
-export { parseFrontmatter, serializeFrontmatter, normalizeMeta, normalizeDate, parseScalar };
+export {
+  parseFrontmatter,
+  serializeFrontmatter,
+  normalizeMeta,
+  normalizeDate,
+  parseScalar,
+  IMG_NAME_RE,
+  kvImageKey,
+  kvImageName,
+  imgContentType,
+};

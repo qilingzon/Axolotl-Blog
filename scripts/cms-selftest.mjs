@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 
 const mod = await import('../edge-functions/api/[[default]].js');
 const { parseFrontmatter, serializeFrontmatter, normalizeMeta, normalizeDate, parseScalar } = mod;
+const { IMG_NAME_RE, kvImageKey, kvImageName, imgContentType } = mod;
 
 let pass = 0;
 let fail = 0;
@@ -142,6 +143,38 @@ t('parseScalar 数字字符串保持字符串（仅布尔/列表特判）', () =
 
 t('parseScalar 列表字符串', () => {
   assert.deepEqual(parseScalar('[a, b]'), ['a', 'b']);
+});
+
+// ---------- KV 零构建上传：key 编码与内容类型 ----------
+
+t('kvImageKey/kvImageName 往返一致（含 . 和 - 的图片名）', () => {
+  const name = 'screenshot-3x8f2k1.webp';
+  const key = kvImageKey(name);
+  // KV key 官方限制：仅字母/数字/下划线
+  assert.match(key, /^[0-9A-Za-z_]+$/);
+  assert.ok(key.startsWith('u_'));
+  assert.equal(kvImageName(key), name);
+});
+
+t('kvImageKey 拒绝不了中文名（编码可逆即可，白名单在 IMG_NAME_RE）', () => {
+  // 中文经 UTF-8 十六进制编码后同样是字母数字，key 合法；名字合法性由 IMG_NAME_RE 把关
+  const key = kvImageKey('图.png');
+  assert.match(key, /^[0-9A-Za-z_]+$/);
+  assert.equal(kvImageName(key), '图.png');
+});
+
+t('IMG_NAME_RE 白名单：合法名过、路径穿越与中文被拒', () => {
+  assert.ok(IMG_NAME_RE.test('a-b_1.webp'));
+  assert.ok(!IMG_NAME_RE.test('../secret.png'));
+  assert.ok(!IMG_NAME_RE.test('中文名.png'));
+  assert.ok(!IMG_NAME_RE.test('a.png.exe'));
+});
+
+t('imgContentType 按扩展名给对 MIME', () => {
+  assert.equal(imgContentType('a.jpg'), 'image/jpeg');
+  assert.equal(imgContentType('a.webp'), 'image/webp');
+  assert.equal(imgContentType('a.avif'), 'image/avif');
+  assert.equal(imgContentType('a.txt'), 'application/octet-stream');
 });
 
 console.log('');
