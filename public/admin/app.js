@@ -1910,7 +1910,6 @@ function renderEditor(slug) {
         mdBtn('标题', '把这一行变成大标题（## ）', '## ', '') + mdBtn('小标题', '把这一行变成小标题（### ）', '### ', '') +
         mdBtn('加粗', '把选中的文字加粗', '**', '**') + mdBtn('斜体', '把选中的文字变斜体', '*', '*') +
         mdBtn('链接', '给选中文字加个网址', '[', '](https://)') +
-        mdBtn('图片', '插入一张图片', '![', '](/assets/uploads/)') +
         '<button type="button" class="ed-topbar__btn" id="pro-pick-btn" title="从媒体库选一张，插到光标处（也能顺手上传新图）">选图</button>' +
         mdBtn('引用', '引用块', '> ', '') + mdBtn('代码', '代码块', '\n```\n', '\n```\n') +
         mdBtn('表格', '表格', '\n| 列1 | 列2 |\n| --- | --- |\n| ', ' | |\n') +
@@ -2079,9 +2078,54 @@ function bindEditor(origSlug, post) {
     if (!btn) return;
     var before = btn.dataset.before.replace(/\\n/g, '\n');
     var after = btn.dataset.after.replace(/\\n/g, '\n');
-    ta.setRangeText(before + after, ta.selectionStart, ta.selectionEnd, 'select');
+    var start = ta.selectionStart;
+    var end = ta.selectionEnd;
+    var value = ta.value;
+    var hasSel = start !== end;
+    var newStart;
+    var newEnd;
+    if (after) {
+      // 包裹型（加粗/斜体/链接/代码/表格）：标记包住选中文字；没选中就插一对空标记，
+      // 光标卡在两个标记中间——点完直接打字，字落在格式里，标记不会被顶掉。
+      // 链接的 https:// 占位串插完自动选中，打字即整体替换成真实网址
+      var inner = value.slice(start, end);
+      ta.setRangeText(before + inner + after, start, end, 'end');
+      if (hasSel) {
+        newStart = start + before.length;
+        newEnd = newStart + inner.length;
+      } else {
+        newStart = newEnd = start + before.length;
+      }
+      if (after.indexOf('https://') !== -1) {
+        var urlStart = start + before.length + inner.length + 2; // 跳过 ']('
+        newStart = urlStart;
+        newEnd = urlStart + 8; // 'https://'.length，选中占位等用户打字替换
+      }
+    } else {
+      // 行前缀型（标题/小标题/引用）：作用于光标所在行，不碰选区其他行——
+      // 同款再点一次=取消；点另一档=直接换档（### ↔ ##）；光标落行尾，接着打字就是这行格式
+      var lineStart = value.lastIndexOf('\n', start - 1) + 1;
+      var lineEnd = value.indexOf('\n', start);
+      if (lineEnd === -1) lineEnd = value.length;
+      var line = value.slice(lineStart, lineEnd);
+      var old = '';
+      var h = line.match(/^#{1,6} /);
+      if (before === '## ' || before === '### ') {
+        if (h) old = h[0];
+      } else if (line.indexOf('> ') === 0) {
+        old = '> ';
+      }
+      var rest = line.slice(old.length);
+      var newLine = old === before ? rest : before + rest;
+      ta.setRangeText(newLine, lineStart, lineEnd, 'end');
+      newStart = newEnd = lineStart + newLine.length;
+    }
+    ta.setSelectionRange(newStart, newEnd);
     ta.focus();
+    dirty = true;
     pushHist();
+    refreshPreview();
+    updateWordCount();
   });
 
   // 进阶模式「选图」：同一个媒体库选图器（小白模式也用它），选完插到光标处
