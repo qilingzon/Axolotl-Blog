@@ -399,7 +399,7 @@ function renderShell(active, contentHtml) {
     '</nav>' +
     '<button class="icon-btn" id="theme-btn" title="切换主题">' + esc((THEMES.find(function (t) { return t.id === themeNow; }) || THEMES[0]).label) + '</button>' +
     '<a class="icon-btn" href="/" target="_blank" rel="noopener">看博客</a>' +
-    '<button class="icon-btn" id="settings-btn" title="攒批入库设置">⚙</button>' +
+    '<button class="icon-btn" id="settings-btn" title="攒批入库设置">⚙ 设置</button>' +
     '<button class="icon-btn" id="help-btn" title="使用技巧速查">?</button>' +
     '<button class="icon-btn" id="logout-btn">退出</button>' +
     '</div></header>' +
@@ -706,6 +706,7 @@ function renderDashboard() {
         }
         var html =
           '<div class="page-head"><h1>仪表盘</h1><span class="spacer"></span>' +
+          '<button type="button" class="btn btn--ghost" id="dash-settings-btn" title="设置攒多少篇自动打包入库构建">⚙ 攒批设置</button>' +
           '<a class="btn" href="#/editor/new">写新文章</a></div>' +
           (data.pending
             ? '<div class="flush-banner"><span>📦 有 ' +
@@ -729,6 +730,8 @@ function renderDashboard() {
           actHtml +
           '</div>';
         renderShell('dashboard', html);
+        var dashSettingsBtn = $('#dash-settings-btn');
+        if (dashSettingsBtn) dashSettingsBtn.addEventListener('click', openSettingsModal);
         // 攒批横幅按钮：点了立刻打包入库（不关横幅，计数下次进仪表盘刷新）
         var flushBtn = $('#flush-now');
         if (flushBtn) {
