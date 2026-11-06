@@ -68,7 +68,7 @@ export async function onRequestGet(context) {
     status: 200,
     headers: {
       'Content-Type': CONTENT_TYPES[ext] || 'application/octet-stream',
-      'Cache-Control': 'public, max-age=31536000, immutable',
+      'Cache-Control': 'public, max-age=86400',
     },
   });
 }

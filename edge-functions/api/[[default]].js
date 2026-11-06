@@ -105,6 +105,7 @@ function tooManyFails() {
 }
 
 function recordFail() {
+  if (Date.now() >= loginFails.until) loginFails.count = 0;
   loginFails.count += 1;
   loginFails.until = Date.now() + 15 * 60 * 1000;
 }
@@ -261,6 +262,7 @@ export async function onRequest(context) {
           expiresAt: Date.now() + ttl,
           token: await issueToken(auth.u),
           renewed: true,
+          kv: !!kvStore(),
         });
       }
       return json({ user: auth.u, expiresAt: auth.e, kv: !!kvStore() });
@@ -645,13 +647,18 @@ async function handlePostItem(method, slug, request) {
   }
 
   if (method === 'PUT') {
-    const input = await request.json();
-    const meta = normalizeMeta(input.post || input);
-    const body = String(input.body || '');
-    const html = String(input.html || '');
-    const saveMode = String(input.saveMode || '');
+    let input;
+    try {
+      input = await request.json();
+    } catch {
+      return fail('请求格式错误', 400);
+    }
+    const meta = normalizeMeta((input && input.post) || input || {});
+    const body = String((input && input.body) || '');
+    const html = String((input && input.html) || '');
+    const saveMode = String((input && input.saveMode) || '');
     const content = bytesToB64(enc.encode(serializeFrontmatter(meta, body)));
-    const oldSlug = String(input.oldSlug || '');
+    const oldSlug = String((input && input.oldSlug) || '');
 
     // 已存在则取 sha（更新），不存在则新建
     const existing = await ghFetch(repoSegments('contents', filePath)).catch((e) => {
@@ -747,7 +754,9 @@ async function handlePostsFlush() {
     }
   }
   if (!items.length) {
-    await kvWritePend(kv, {});
+    const latestPend = await kvReadPend(kv);
+    for (const s of slugs) delete latestPend[s];
+    await kvWritePend(kv, latestPend);
     return json({ ok: true, committed: 0 });
   }
 
@@ -781,7 +790,9 @@ async function handlePostsFlush() {
     throw e;
   }
   for (const it of items) await kv.delete(kvPostKey(it.slug)).catch(() => {});
-  await kvWritePend(kv, {});
+  const latestPend = await kvReadPend(kv);
+  for (const it of items) delete latestPend[it.slug];
+  await kvWritePend(kv, latestPend);
   return json({ ok: true, committed: items.length, slugs: items.map((i) => i.slug) });
 }
 
@@ -869,6 +880,8 @@ async function handleVersionRestore(slug, request) {
       sha: existing.sha,
     },
   });
+  const kv = kvStore();
+  if (kv) await kvForgetPost(kv, slug);
   return json({ ok: true, slug });
 }
 
@@ -996,10 +1009,15 @@ async function handleListMedia() {
 }
 
 async function handleUploadMedia(request) {
-  const input = await request.json();
-  const name = String(input.name || '');
+  let input;
+  try {
+    input = await request.json();
+  } catch {
+    return fail('请求格式错误', 400);
+  }
+  const name = String((input && input.name) || '');
   if (!IMG_NAME_RE.test(name)) return fail('文件名不合法（仅支持 png/jpg/webp/gif/avif）');
-  const data = String(input.data || '');
+  const data = String((input && input.data) || '');
   if (!data) return fail('缺少图片数据');
   const kv = kvStore();
   if (kv) {
@@ -1149,4 +1167,8 @@ export {
   SLUG_RE,
   kvPostKey,
   mergePostsWithPending,
+  safeEqual,
+  b64ToBytes,
+  stripQuotes,
+  postRefsImage,
 };

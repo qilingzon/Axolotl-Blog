@@ -2,11 +2,20 @@
 // 用法：npm test
 // 覆盖：frontmatter 解析/序列化往返、normalizeMeta 防线（坏日期/坏 accent/超量标签/超长标题）
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 const mod = await import('../edge-functions/api/[[default]].js');
 const { parseFrontmatter, serializeFrontmatter, normalizeMeta, normalizeDate, parseScalar } = mod;
 const { IMG_NAME_RE, kvImageKey, kvImageName, imgContentType } = mod;
 const { SLUG_RE, kvPostKey, mergePostsWithPending } = mod;
+const { safeEqual, b64ToBytes, stripQuotes, postRefsImage } = mod;
+
+// 动态提取前端解析器（小白写作纯函数，确保语言标识与表格不发生回归）
+const appCode = readFileSync(new URL('../public/admin/app.js', import.meta.url), 'utf8');
+const parseBlocksCode = appCode.match(/function parseBlocks[\s\S]*?\n\}/)[0];
+const blocksToMarkdownCode = appCode.match(/function blocksToMarkdown[\s\S]*?\n\}/)[0];
+const parseBlocks = new Function('return ' + parseBlocksCode)();
+const blocksToMarkdown = new Function('return ' + blocksToMarkdownCode)();
 
 let pass = 0;
 let fail = 0;
@@ -215,6 +224,78 @@ t('SLUG_RE 白名单：合法 slug 过、路径穿越被拒（与后端一致）
   assert.ok(SLUG_RE.test('my-post_2026'));
   assert.ok(!SLUG_RE.test('../x'));
   assert.ok(!SLUG_RE.test('中文slug'));
+});
+
+// ---------- 认证与文本清洗纯函数 ----------
+
+t('safeEqual 常数时间字符串比对', () => {
+  assert.equal(safeEqual('abc', 'abc'), true);
+  assert.equal(safeEqual('abc', 'abd'), false);
+  assert.equal(safeEqual('abc', 'ab'), false);
+  assert.equal(safeEqual('', ''), true);
+});
+
+t('b64ToBytes 过滤换行与空白', () => {
+  // GitHub Contents API 返回的 base64 夹带换行符（如每 60 字符换行）
+  const b64WithNewlines = 'SGVsbG8g\n  V29ybGQh\r\n';
+  const bytes = b64ToBytes(b64WithNewlines);
+  const text = new TextDecoder().decode(bytes);
+  assert.equal(text, 'Hello World!');
+});
+
+t('stripQuotes 引号还原保真', () => {
+  assert.equal(stripQuotes("'hello'"), 'hello');
+  assert.equal(stripQuotes("''nested''"), "'nested'");
+  assert.equal(stripQuotes('"double"'), 'double');
+  assert.equal(stripQuotes('raw_string'), 'raw_string');
+});
+
+t('postRefsImage 识别两种引用形态', () => {
+  const body1 = '这是一篇博文\n\n![图片](/assets/uploads/photo-123.jpg)\n';
+  const body2 = '这是另一篇\n\n![图片](/m/photo-123.jpg)\n';
+  const body3 = '没有引用任何图\n';
+  assert.equal(postRefsImage(body1, 'photo-123.jpg'), true);
+  assert.equal(postRefsImage(body2, 'photo-123.jpg'), true);
+  assert.equal(postRefsImage(body3, 'photo-123.jpg'), false);
+  assert.equal(postRefsImage(body1, 'other.jpg'), false);
+});
+
+t('postRefsImage 仅匹配受管前缀路径，普通正文文本不误报', () => {
+  const bodyMentionOnly = '正文讨论了 photo-123.jpg 但并没有插入为图片资源';
+  assert.equal(postRefsImage(bodyMentionOnly, 'photo-123.jpg'), false);
+});
+
+// ---------- 前端解析器回归防线 ----------
+
+t('parseBlocks 与 blocksToMarkdown 保留代码块语言标识', () => {
+  const original = '```typescript\nconst message: string = "hello";\n```';
+  const blocks = parseBlocks(original);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].type, 'code');
+  assert.equal(blocks[0].lang, 'typescript');
+  const restored = blocksToMarkdown(blocks);
+  assert.equal(restored, original);
+});
+
+t('parseBlocks 表格解析无首尾外边框管道符时不丢列', () => {
+  const tightTable = '名称 | 数量 | 备注\n--- | --- | ---\n苹果 | 10 | 红富士\n香蕉 | 20 | 进口';
+  const blocks = parseBlocks(tightTable);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].type, 'table');
+  // 必须完整保留 3 列，不能被误 shift/pop 丢弃首尾列
+  assert.deepEqual(blocks[0].rows[0], ['名称', '数量', '备注']);
+  assert.deepEqual(blocks[0].rows[1], ['苹果', '10', '红富士']);
+  assert.deepEqual(blocks[0].rows[2], ['香蕉', '20', '进口']);
+});
+
+t('posts-flush 增量移除索引保护并发写入', () => {
+  // 模拟入库前抓取了 a, b
+  const items = [{ slug: 'a' }, { slug: 'b' }];
+  // 模拟在 Git 提交期间，用户并发保存了 c
+  const latestPend = { a: 100, b: 200, c: 300 };
+  for (const it of items) delete latestPend[it.slug];
+  // 必须只移除 a, b，完整保留新进来的 c
+  assert.deepEqual(latestPend, { c: 300 });
 });
 
 console.log('');

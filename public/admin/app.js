@@ -333,6 +333,7 @@ var app = null;
 // 编辑器打开时登记 editorGuard（route + isDirty + ask）；nav 拦截一切离开动作：
 // 留下 = 哈希退回编辑器路由且不重渲染（脏内容还在 DOM 里），离开 = 用户确认后再跳
 var editorGuard = null;
+var autodraftTimer = null; // 编辑器自动暂存定时器（单例管理，防止多文章切换时泄露驻留）
 var restoringHash = false;
 var lastSavedAt = 0; // 最近一次保存成功的时间（跨编辑器实例；用于「看线上页面」构建空窗期提示）
 var pendingTag = ''; // 从标签总览点进来要预选的标签（renderPosts 消费后清空）
@@ -354,10 +355,18 @@ function nav() {
       restoringHash = false;
       if (leave) {
         editorGuard = null;
+        if (autodraftTimer) { clearInterval(autodraftTimer); autodraftTimer = null; }
         location.hash = target;
       }
     });
     return;
+  }
+  if (editorGuard && !editorGuard.isDirty() && hash !== editorGuard.route) {
+    editorGuard = null;
+  }
+  if (!hash.startsWith('#/editor/') && autodraftTimer) {
+    clearInterval(autodraftTimer);
+    autodraftTimer = null;
   }
   if (restoringHash) {
     restoringHash = false;
@@ -1190,13 +1199,14 @@ function parseBlocks(md) {
     var line = lines[i];
     if (line.startsWith('```')) {
       flushPara();
+      var lang = line.slice(3).trim();
       var codeBuf = [];
       i++;
       while (i < lines.length && !lines[i].startsWith('```')) {
         codeBuf.push(lines[i]);
         i++;
       }
-      blocks.push({ type: 'code', text: codeBuf.join('\n') });
+      blocks.push({ type: 'code', lang: lang, text: codeBuf.join('\n') });
       continue;
     }
     if (/^\s*$/.test(line)) {
@@ -1240,9 +1250,12 @@ function parseBlocks(md) {
       }
       i--;
       var parseRow = function (r) {
-        var cells = r.split('|');
-        cells.shift();
-        cells.pop();
+        var s = String(r || '').trim();
+        var hasLeadingPipe = s.charAt(0) === '|';
+        var hasTrailingPipe = s.length > 1 && s.charAt(s.length - 1) === '|' && s.slice(-2) !== '\\|';
+        var cells = s.split('|');
+        if (hasLeadingPipe) cells.shift();
+        if (hasTrailingPipe) cells.pop();
         return cells.map(function (c) { return c.trim(); });
       };
       blocks.push({
@@ -1310,7 +1323,7 @@ function blocksToMarkdown(blocks) {
       }
       return '![' + (b.alt || '') + '](' + (b.url || '') + ')';
     }
-    if (b.type === 'code') return '```\n' + b.text + '\n```';
+    if (b.type === 'code') return '```' + (b.lang || '') + '\n' + (b.text || '') + '\n```';
     if (b.type === 'raw') return b.text;
     if (b.type === 'list') {
       var counters = [0, 0];
@@ -2432,7 +2445,11 @@ function bindEditor(origSlug, post) {
       b.classList.toggle('active', b.dataset.id === pickedAccent);
     });
   }
-  setInterval(function () {
+  if (autodraftTimer) {
+    clearInterval(autodraftTimer);
+    autodraftTimer = null;
+  }
+  autodraftTimer = setInterval(function () {
     if (!dirty) return;
     try {
       localStorage.setItem(AUTODRAFT_KEY, JSON.stringify({
@@ -2492,9 +2509,10 @@ function bindEditor(origSlug, post) {
     });
   }
 
-  // Ctrl/Cmd+S 保存：绑在编辑器卡片上（冒泡覆盖小白/进阶/字段所有输入处），
-  // 焦点在卡内任意输入处都能直接保存，不用鼠标去找按钮
-  $('#editor-card').addEventListener('keydown', function (e) {
+  // Ctrl/Cmd+S 保存：绑在编辑器外层网格上（冒泡覆盖小白/进阶/字段所有输入处），
+  // 焦点在卡内任意输入处（包括标题/标签/正文）都能直接保存，不用鼠标去找按钮，不唤起系统另存为
+  var edGrid = document.querySelector('.editor-grid') || $('#editor-card');
+  edGrid.addEventListener('keydown', function (e) {
     if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
       e.preventDefault();
       $('#save-btn').click();
@@ -2555,6 +2573,7 @@ function bindEditor(origSlug, post) {
         } else {
           toast('已保存，站点构建约需一分钟');
         }
+        if (autodraftTimer) { clearInterval(autodraftTimer); autodraftTimer = null; }
         location.hash = '#/posts';
       })
       .catch(function (err) {
@@ -2616,6 +2635,7 @@ function bindEditor(origSlug, post) {
                 if (last && last.slug === origSlug) localStorage.removeItem(LAST_EDIT_KEY);
               } catch (e) {}
               toast(data && data.kvOnly ? '已删除（这篇还没入库过，不触发构建）' : '已删除');
+              if (autodraftTimer) { clearInterval(autodraftTimer); autodraftTimer = null; }
               location.hash = '#/posts';
             })
             .catch(function (err) {
@@ -2922,25 +2942,37 @@ function renderMedia() {
             }
           });
           $('#media-batch-del').addEventListener('click', function () {
-            var names = Array.prototype.map.call(
+            var selectedNames = Array.prototype.map.call(
               $('#media-list').querySelectorAll('input[data-pick]:checked'),
               function (c) {
                 return c.dataset.pick;
               }
             );
-            if (!names.length) return;
-            confirmModal(
-              '批量删除图片',
-              '确定删除选中的 ' + names.length + ' 张图片吗？（' +
-                names.slice(0, 3).join('、') + (names.length > 3 ? ' 等' : '') +
-                '）被文章引用的会保留。',
-              '删除'
-            ).then(function (yes) {
+            if (!selectedNames.length) return;
+            var referenced = [];
+            var toDelete = [];
+            selectedNames.forEach(function (n) {
+              if (refsMap && refsMap[n] && refsMap[n].length > 0) {
+                referenced.push(n);
+              } else {
+                toDelete.push(n);
+              }
+            });
+            if (!toDelete.length) {
+              toast('选中的 ' + selectedNames.length + ' 张图片都在被文章引用，已全部保护保留', true);
+              return;
+            }
+            var tip = '确定删除选中的 ' + toDelete.length + ' 张未引用图片吗？（' +
+              toDelete.slice(0, 3).join('、') + (toDelete.length > 3 ? ' 等' : '') + '）';
+            if (referenced.length) {
+              tip += '另有 ' + referenced.length + ' 张正被文章引用，已自动跳过保护。';
+            }
+            confirmModal('批量删除图片', tip, '删除').then(function (yes) {
               if (!yes) return;
               var doneN = 0;
               var failNames = [];
               var chain = Promise.resolve();
-              names.forEach(function (n) {
+              toDelete.forEach(function (n) {
                 chain = chain.then(function () {
                   return api('DELETE', 'media', { query: { name: n } }).then(
                     function () {
@@ -2955,6 +2987,7 @@ function renderMedia() {
               chain.then(function () {
                 toast(
                   '已删 ' + doneN + ' 张' +
+                    (referenced.length ? '（跳过 ' + referenced.length + ' 张引用中）' : '') +
                     (failNames.length
                       ? '，' + failNames.length + ' 张失败' +
                         (failNames.length <= 3 ? '（' + failNames.join('、') + '）' : '')
@@ -3106,26 +3139,38 @@ function renameImageFlow(name) {
   function onKey(e) {
     if (e.key === 'Escape' && document.querySelectorAll('.modal-mask').length <= 1) close();
   }
+  function submit() {
+    var to = input.value.trim();
+    if (!to) {
+      errEl.textContent = '文件名不能为空';
+      return;
+    }
+    if (to === name) {
+      errEl.textContent = '新文件名与原名相同';
+      return;
+    }
+    var btn = mask.querySelector('[data-act="yes"]');
+    btn.disabled = true;
+    errEl.textContent = '';
+    api('PATCH', 'media', { query: { name: name }, body: { name: to } })
+      .then(function (res) {
+        close();
+        toast((res && res.warn ? res.warn + ' ' : '') + '已重命名为 ' + to, !!(res && res.warn));
+        renderMedia();
+      })
+      .catch(function (err) {
+        errEl.textContent = err.message;
+        btn.disabled = false;
+      });
+  }
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') submit();
+  });
   mask.addEventListener('click', function (e) {
     var act = e.target.getAttribute && e.target.getAttribute('data-act');
     if (act === 'no') close();
     else if (e.target === mask) close();
-    else if (act === 'yes') {
-      var to = input.value.trim();
-      if (!to || to === name) return;
-      var btn = mask.querySelector('[data-act="yes"]');
-      btn.disabled = true;
-      api('PATCH', 'media', { query: { name: name }, body: { name: to } })
-        .then(function (res) {
-          close();
-          toast((res && res.warn ? res.warn + ' ' : '') + '已重命名为 ' + to, !!(res && res.warn));
-          renderMedia();
-        })
-        .catch(function (err) {
-          errEl.textContent = err.message;
-          btn.disabled = false;
-        });
-    }
+    else if (act === 'yes') submit();
   });
   document.addEventListener('keydown', onKey);
 }
@@ -3268,7 +3313,8 @@ function deleteImageFlow(name) {
     .then(function (list) {
       if (!list) return ask();
       var used = list.filter(function (p) {
-        return String(p.body || '').indexOf('/assets/uploads/' + name) !== -1;
+        var body = String(p.body || '');
+        return body.indexOf('/assets/uploads/' + name) !== -1 || body.indexOf('/m/' + name) !== -1;
       });
       if (!used.length) return ask();
       var titles = used
