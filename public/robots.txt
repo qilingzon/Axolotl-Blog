@@ -1,0 +1,10 @@
+# 美西螈池塘 · 爬虫规则
+User-agent: *
+Allow: /
+# 后台与作者私密页不对爬虫开放
+Disallow: /admin/
+Disallow: /p/
+Disallow: /preview/
+Disallow: /api/
+# 站点地图
+Sitemap: https://www.iqii.cn/sitemap-index.xml
