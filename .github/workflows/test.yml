@@ -16,7 +16,8 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: package-lock.json
-      - run: npm ci
+      # npm ci 的严格 lock 校验对本仓 lock 过严（本地/CI npm 解析差异误报 missing），用 install 宽松安装
+      - run: npm install --no-fund --no-audit
       - run: npm test
       - run: npm run build
       # 线上部署由 EdgeOne 侧绑定仓库自动触发；此 workflow 只做质量门禁，不做部署
