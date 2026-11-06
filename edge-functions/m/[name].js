@@ -69,6 +69,7 @@ export async function onRequestGet(context) {
     headers: {
       'Content-Type': CONTENT_TYPES[ext] || 'application/octet-stream',
       'Cache-Control': 'public, max-age=86400',
+      'X-Content-Type-Options': 'nosniff',
     },
   });
 }

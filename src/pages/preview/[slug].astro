@@ -60,7 +60,9 @@ const BUILD_TIME = Date.now();
             return r.ok ? r.json() : null;
           })
           .then(function (d) {
-            if (!d || !d.at || d.at <= builtAt || !d.html) return;
+            // typeof 严格校验：非数字 at 与 builtAt 比较得 NaN 会绕过 <= 守卫。
+            // 这里是作者私密预览页，草稿内容照常替换（预览草稿本就是这个页面的职责）
+            if (!d || typeof d.at !== 'number' || d.at <= builtAt || !d.html) return;
             var bodyEl = document.querySelector('.post__body');
             if (bodyEl) bodyEl.innerHTML = d.html;
             var titleEl = document.querySelector('.post__title');

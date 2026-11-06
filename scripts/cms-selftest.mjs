@@ -16,12 +16,49 @@ const parseBlocksCode = appCode.match(/function parseBlocks[\s\S]*?\n\}/)[0];
 const blocksToMarkdownCode = appCode.match(/function blocksToMarkdown[\s\S]*?\n\}/)[0];
 const parseBlocks = new Function('return ' + parseBlocksCode)();
 const blocksToMarkdown = new Function('return ' + blocksToMarkdownCode)();
+// 渲染安全管线（esc/safeUrl/safeImgTag/renderMarkdown 同作用域提取，验证白名单与协议过滤）
+const mdSandbox = new Function(
+  appCode.match(/function esc[\s\S]*?\n\}/)[0] +
+    '\n' + appCode.match(/function safeUrl[\s\S]*?\n\}/)[0] +
+    '\n' + appCode.match(/function safeImgTag[\s\S]*?\n\}/)[0] +
+    '\n' + appCode.match(/function renderMarkdown[\s\S]*?\n\}/)[0] +
+    '\nreturn { esc: esc, safeUrl: safeUrl, safeImgTag: safeImgTag, renderMarkdown: renderMarkdown };'
+)();
+const { safeUrl, safeImgTag, renderMarkdown } = mdSandbox;
 
 let pass = 0;
 let fail = 0;
+let asyncPending = 0;
+function finish() {
+  console.log('');
+  console.log(`RESULT pass=${pass} fail=${fail}`);
+  process.exit(fail ? 1 : 0);
+}
+function done() {
+  if (asyncPending > 0) return; // 还有异步用例在跑
+  finish();
+}
 function t(name, fn) {
   try {
-    fn();
+    const r = fn();
+    if (r && typeof r.catch === 'function') {
+      asyncPending++;
+      r.then(
+        () => {
+          asyncPending--;
+          pass++;
+          console.log('PASS ' + name);
+          done();
+        },
+        (e) => {
+          asyncPending--;
+          fail++;
+          console.log('FAIL ' + name + ' :: ' + (e && e.message));
+          done();
+        }
+      );
+      return;
+    }
     pass++;
     console.log('PASS ' + name);
   } catch (e) {
@@ -29,6 +66,13 @@ function t(name, fn) {
     console.log('FAIL ' + name + ' :: ' + (e && e.message));
   }
 }
+setTimeout(() => {
+  if (asyncPending > 0) {
+    console.log('FAIL 异步用例 5 秒未完成');
+    fail++;
+  }
+  finish();
+}, 5000).unref();
 
 // ---------- normalizeDate：日期防线 ----------
 
@@ -298,6 +342,115 @@ t('posts-flush 增量移除索引保护并发写入', () => {
   assert.deepEqual(latestPend, { c: 300 });
 });
 
-console.log('');
-console.log(`RESULT pass=${pass} fail=${fail}`);
-process.exit(fail ? 1 : 0);
+// ---------- 2026-11-06 第23批：YAML 换行防线 + 渲染安全管线 ----------
+
+t('normalizeMeta 字符串字段换行压成空格（YAML 断行防线）', () => {
+  const m = normalizeMeta({ title: '坏标题\n---\n注入', description: 'a\r\nb', tags: ['x\ny', '  '] });
+  assert.ok(!m.title.includes('\n'));
+  assert.equal(m.title, '坏标题 --- 注入');
+  assert.equal(m.description, 'a b');
+  assert.deepEqual(m.tags, ['x y']);
+});
+
+t('换行清洗后 serialize→parse 不再产生文档分隔符', () => {
+  const text = serializeFrontmatter(normalizeMeta({ title: 'a\n---\nb' }), '正文');
+  // 整个 frontmatter 里只能有开头结尾两个 --- 分隔行
+  assert.equal(text.split('\n').filter((l) => l === '---').length, 2);
+  const back = parseFrontmatter(text);
+  assert.equal(normalizeMeta(back.meta).title, 'a --- b');
+});
+
+t('safeUrl 白名单：http(s)/站内/锚点/相对路径过，javascript:/data: 拒', () => {
+  assert.equal(safeUrl('https://example.com/a?b=1'), 'https://example.com/a?b=1');
+  assert.equal(safeUrl('/m/a.webp'), '/m/a.webp');
+  assert.equal(safeUrl('#sec'), '#sec');
+  assert.equal(safeUrl('assets/img.png'), 'assets/img.png');
+  assert.equal(safeUrl('javascript:alert(1)'), '');
+  assert.equal(safeUrl('data:text/html;base64,xxx'), '');
+  assert.equal(safeUrl(''), '');
+});
+
+t('safeImgTag 属性白名单：事件属性丢弃、自家图片块格式无损', () => {
+  const out = safeImgTag('<img src="/m/a.webp" alt="图" onerror="alert(1)" style="max-width:85%">');
+  assert.ok(out.includes('src="/m/a.webp"'));
+  assert.ok(out.includes('alt="图"'));
+  assert.ok(out.includes('style="max-width:85%"'));
+  assert.ok(!out.includes('onerror'));
+  const bad = safeImgTag('<img src="javascript:alert(1)" onerror="alert(2)">');
+  assert.ok(bad.startsWith('<p>')); // src 可疑 → 整行降级纯文本，不输出标签
+  assert.ok(!bad.includes('<img'));
+});
+
+t('renderMarkdown 链接与图片协议过滤', () => {
+  const h1 = renderMarkdown('[点我](javascript:alert%281%29)');
+  assert.ok(!h1.includes('<a href="javascript'));
+  assert.ok(h1.includes('点我')); // 文本保留，链接去掉
+  const h2 = renderMarkdown('[正常](https://example.com)');
+  assert.ok(h2.includes('<a href="https://example.com"'));
+  const h3 = renderMarkdown('![图](javascript:alert(1))');
+  assert.ok(!h3.includes('<img'));
+});
+
+t('renderMarkdown 独立成行 img 走白名单重建', () => {
+  const h = renderMarkdown('<img src="/m/a.webp" alt="x" onload="alert(1)" />');
+  assert.ok(h.includes('src="/m/a.webp"'));
+  assert.ok(!h.includes('onload'));
+});
+
+t('renderMarkdown 表格无外边框不丢列、\\| 转义不切列', () => {
+  const tight = '名称 | 数量\n--- | ---\na\\|b | 10';
+  const html = renderMarkdown(tight);
+  assert.ok(html.includes('<th>名称</th>'));
+  assert.ok(html.includes('<th>数量</th>'));
+  assert.ok(html.includes('<td>a|b</td>')); // 转义的竖线还原成一个格子
+  assert.ok(html.includes('<td>10</td>'));
+});
+
+t('小白模式表格 \\| 转义往返无损（不再劈成两列/全角变形）', () => {
+  const md = '| 名称 | 数量 |\n| --- | --- |\n| a\\|b | 10 |';
+  const blocks = parseBlocks(md);
+  assert.equal(blocks[0].rows[1][0], 'a|b');
+  const back = blocksToMarkdown(blocks);
+  assert.ok(back.includes('a\\|b')); // 序列化时按 GFM 标准转义回去，不再是全角 ｜
+  const re = parseBlocks(back);
+  assert.deepEqual(re[0].rows[1], ['a|b', '10']);
+});
+
+// ---------- /p/?fmt=json 探针数据源：draft 门禁与 no-store（公开页不能把草稿推给访客） ----------
+
+function makeFakeKv() {
+  const store = new Map();
+  return {
+    get: async (k) => (store.has(k) ? store.get(k) : null),
+    put: async (k, v) => {
+      store.set(k, String(v));
+    },
+    delete: async (k) => {
+      store.delete(k);
+    },
+  };
+}
+
+t('/p/?fmt=json 带出 draft 标志且 no-store（草稿门禁的数据源半边）', async () => {
+  const mod = await import('../edge-functions/p/[slug].js');
+  const kv = makeFakeKv();
+  // slug 'draft-post' 的十六进制 key 与 prod kvPostKey 同构（p_ 前缀）
+  const hex = (s) => Buffer.from(s, 'utf8').toString('hex');
+  await kv.put('p_' + hex('draft-post'), JSON.stringify({ slug: 'draft-post', meta: { title: '草稿文', draft: true, pubDate: '2026-11-06T00:00:00.000Z' }, body: 'x', html: '<p>y</p>', at: 123 }));
+  await kv.put('p_' + hex('live-post'), JSON.stringify({ slug: 'live-post', meta: { title: '正式文', draft: false, pubDate: '2026-11-06T00:00:00.000Z' }, body: 'x', html: '<p>y</p>', at: 456 }));
+  const call = (slug) =>
+    mod.onRequestGet({
+      params: { slug },
+      env: { CMS_KV: kv },
+      request: new Request('http://x.test/p/' + slug + '?fmt=json'),
+    });
+  const dDraft = await (await call('draft-post')).json();
+  assert.equal(dDraft.draft, true);
+  assert.equal(dDraft.title, '草稿文');
+  const dLive = await (await call('live-post')).json();
+  assert.equal(dLive.draft, false);
+  const headers = (await call('live-post')).headers;
+  assert.match(headers.get('cache-control') || '', /no-store/);
+});
+
+done();

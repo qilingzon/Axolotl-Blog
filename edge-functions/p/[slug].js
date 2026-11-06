@@ -109,7 +109,12 @@ export async function onRequestGet(context) {
   const url = new URL(context.request.url);
   if (url.searchParams.get('fmt') === 'json') {
     return new Response(
-      JSON.stringify({ at: v.at || 0, title: String(meta.title || slug), html: String(v.html || '') }),
+      JSON.stringify({
+        at: v.at || 0,
+        title: String(meta.title || slug),
+        html: String(v.html || ''),
+        draft: meta.draft === true, // 草稿标志：公开文章页探针见到必须跳过，不能把草稿推给访客
+      }),
       { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } }
     );
   }

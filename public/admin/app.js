@@ -89,7 +89,8 @@ function toast(msg, isErr) {
   }, 2400);
 }
 
-function confirmModal(title, text, okLabel) {
+function confirmModal(title, text, okLabel, opts) {
+  var maskCancellable = !(opts && opts.maskCancellable === false);
   return new Promise(function (resolve) {
     var mask = document.createElement('div');
     mask.className = 'modal-mask';
@@ -114,7 +115,8 @@ function confirmModal(title, text, okLabel) {
     mask.addEventListener('click', function (e) {
       var act = e.target.getAttribute && e.target.getAttribute('data-act');
       if (act) done(act === 'yes');
-      else if (e.target === mask) done(false);
+      else if (e.target === mask && maskCancellable) done(false);
+      // maskCancellable=false 时点遮罩不关闭：防止"发现自动暂存"弹窗被随手一点当取消，误删暂存
     });
     document.body.appendChild(mask);
     document.addEventListener('keydown', onKey);
@@ -345,14 +347,21 @@ window.addEventListener('beforeunload', function (e) {
   }
 });
 
+// 路由序号：nav() 每次实际分派渲染前 +1。异步 fetch 的回调必须核对序号，
+// 序号变了说明路由已切走——不许把旧页面的响应渲染到当前页面上（防止页面与地址不符/脏守卫误伤）
+var navSeq = 0;
+
 function nav() {
   var hash = location.hash || '#/dashboard';
   if (editorGuard && editorGuard.isDirty() && !restoringHash && hash !== editorGuard.route) {
+    if (editorGuard.askPending) return; // 已有确认弹窗在问：后续导航等用户表态，不许叠出一摞弹窗
+    editorGuard.askPending = true;
     var target = hash;
     restoringHash = true;
     location.hash = editorGuard.route; // 触发的 hashchange 由下一分支吞掉，编辑器 DOM 不动
     editorGuard.ask().then(function (leave) {
       restoringHash = false;
+      editorGuard.askPending = false;
       if (leave) {
         editorGuard = null;
         if (autodraftTimer) { clearInterval(autodraftTimer); autodraftTimer = null; }
@@ -381,10 +390,25 @@ function nav() {
     return;
   }
   var parts = hash.slice(2).split('/');
-  if (parts[0] === 'editor' && parts[1]) renderEditor(decodeURIComponent(parts[1]));
-  else if (parts[0] === 'posts') {
+  navSeq++; // 作废所有在途异步渲染：fetch 回来时若路由已变，回调里会因序号不符而放弃渲染
+  if (parts[0] === 'editor' && parts[1]) {
+    var edSlug = parts[1];
+    try {
+      edSlug = decodeURIComponent(parts[1]);
+    } catch (e) {
+      edSlug = parts[1]; // 非法百分号序列（如 %zz）按原样试一把，别让 URIError 卡死导航
+    }
+    renderEditor(edSlug);
+  } else if (parts[0] === 'posts') {
     // #/posts/tag/<名称>：从标签总览点进来，预选筛选（名称经 encodeURIComponent 入哈希）
-    if (parts[1] === 'tag' && parts[2]) pendingTag = decodeURIComponent(parts.slice(2).join('/'));
+    if (parts[1] === 'tag' && parts[2]) {
+      var tagRaw = parts.slice(2).join('/');
+      try {
+        pendingTag = decodeURIComponent(tagRaw);
+      } catch (e) {
+        pendingTag = tagRaw;
+      }
+    }
     renderPosts(parts[1]);
   } else if (parts[0] === 'tags') renderTags();
   else if (parts[0] === 'media') renderMedia();
@@ -491,21 +515,36 @@ function flushThreshold() {
 }
 
 /** 打包入库：把攒批中的所有改动合成 1 个 commit（N 篇 = 1 次构建）；成功后文章缓存作废 */
+var flushInFlight = false; // 在途去重：双击/定时器/手点重叠时只放一个请求出去
 function flushPosts(silent) {
+  if (flushInFlight) {
+    if (!silent) toast('入库正在进行中，请稍等');
+    return Promise.resolve(null);
+  }
+  flushInFlight = true;
   return api('POST', 'posts-flush')
     .then(function (res) {
+      flushInFlight = false;
       state.postsCache = null;
       if (res && res.committed) {
         toast('已入库 ' + res.committed + ' 篇改动（1 次构建，约 1 分钟后全部生效）');
+        refreshPendingViews(); // 就地刷新横幅，别让旧计数误导再点一次
       } else if (!silent) {
         toast('没有攒批中的改动，一切都在库里');
       }
       return res;
     })
     .catch(function (err) {
+      flushInFlight = false;
       if (!silent) toast(err.message, true);
       return null;
     });
+}
+
+/** 入库成功后就地刷新攒批横幅：当前正停在仪表盘才重渲染，其他页面等下次进入自然更新 */
+function refreshPendingViews() {
+  var h = location.hash || '#/dashboard';
+  if (h === '#/dashboard' || h === '' || h === '#') renderDashboard();
 }
 
 /** ⚙ 设置弹窗：攒批模式三选 + 阈值 + 立即入库 */
@@ -566,8 +605,9 @@ function openSettingsModal() {
   mask.addEventListener('click', function (e) {
     var act = e.target.getAttribute && e.target.getAttribute('data-act');
     if (act === 'save') {
-      var n = parseInt(countInput.value, 10);
-      if (!(n >= 1 && n <= 50)) {
+      var n = Number(countInput.value);
+      // Number + 整数校验：'2.9' 不再被静默取整成 2，'1e2' 不再被 parseInt 截成 1
+      if (!Number.isInteger(n) || n < 1 || n > 50) {
         toast('篇数填 1–50 之间的整数', true);
         return;
       }
@@ -638,6 +678,7 @@ function renderLogin() {
 // ---------- 仪表盘 ----------
 
 function renderDashboard() {
+  var seq = navSeq; // 路由竞态守卫：fetch 回来时路由已切走就放弃渲染
   renderShell(
     'dashboard',
     loadingTip('池塘数据搬运中……')
@@ -652,6 +693,7 @@ function renderDashboard() {
     });
   api('GET', 'posts')
     .then(function (data) {
+      if (seq !== navSeq) return null;
       var posts = data.posts || [];
       state.postsCache = posts;
       var tags = {};
@@ -680,6 +722,7 @@ function renderDashboard() {
           '✏️ 继续上次：《' + esc(lastPost.title || lastPost.slug) + '》</a>'
         : '';
       return activity.then(function (act) {
+        if (seq !== navSeq) return null; // 动态请求更慢，回来时页面可能已切走
         var commits = act ? act.commits : null;
         var repoUrl = act ? act.repoUrl : '';
         var actHtml;
@@ -719,7 +762,7 @@ function renderDashboard() {
           '<a class="btn" href="#/editor/new">写新文章</a></div>' +
           (data.pending
             ? '<div class="flush-banner"><span>📦 有 ' +
-              data.pending +
+              esc(data.pending) +
               ' 篇改动还没入库（最老 ' +
               fmtHoursOld(data.pendingOldest) +
               '）——访客已能看到最新版，入库后站点构建一次全部落定</span><button type="button" class="btn btn--sm" id="flush-now">立即入库</button></div>'
@@ -755,6 +798,7 @@ function renderDashboard() {
       });
     })
     .catch(function (err) {
+      if (seq !== navSeq) return; // 401 登出等晚到的失败不许覆盖新页面
       renderShell('dashboard', '<div class="empty-tip">' + esc(err.message) + '</div>');
     });
 }
@@ -807,9 +851,11 @@ function postRowHtml(p, kw) {
 // ---------- 文章列表 ----------
 
 function renderPosts(mode) {
+  var seq = navSeq; // 路由竞态守卫
   renderShell('posts', loadingTip('文章清单搬运中……'));
   api('GET', 'posts')
     .then(function (data) {
+      if (seq !== navSeq) return;
       var posts = (data.posts || []);
       state.postsCache = posts;
       var allTags = [];
@@ -846,7 +892,7 @@ function renderPosts(mode) {
         var filtered = posts.filter(function (p) {
           var hitKw =
             !kw ||
-            p.title.toLowerCase().includes(kw) ||
+            String(p.title || '').toLowerCase().includes(kw) ||
             String(p.body || '').toLowerCase().includes(kw) ||
             (p.tags || []).some(function (t) {
               return t.toLowerCase().includes(kw);
@@ -980,9 +1026,11 @@ function renderPosts(mode) {
 // ---------- 标签总览 ----------
 
 function renderTags() {
+  var seq = navSeq; // 路由竞态守卫
   renderShell('posts', loadingTip('标签整理中……'));
   api('GET', 'posts')
     .then(function (data) {
+      if (seq !== navSeq) return;
       var posts = data.posts || [];
       state.postsCache = posts;
       var counts = {};
@@ -1019,18 +1067,55 @@ function renderTags() {
             '</div>'
           : '<div class="empty-tip">还没有标签，写文章时加几个吧</div>');
       renderShell('posts', html);
-      $('.tags-view').addEventListener('click', function (e) {
-        var chip = e.target.closest('button[data-tag]');
-        if (!chip) return;
-        location.hash = '#/posts/tag/' + encodeURIComponent(chip.dataset.tag);
-      });
+      var tagsView = $('.tags-view');
+      if (tagsView) {
+        tagsView.addEventListener('click', function (e) {
+          var chip = e.target.closest('button[data-tag]');
+          if (!chip) return;
+          location.hash = '#/posts/tag/' + encodeURIComponent(chip.dataset.tag);
+        });
+      }
     })
     .catch(function (err) {
+      if (seq !== navSeq) return;
       renderShell('posts', '<div class="empty-tip">' + esc(err.message) + '</div>');
     });
 }
 
 // ---------- Markdown 渲染（轻量实现，覆盖常用语法） ----------
+
+/** URL 白名单：只放行 http(s)、站内根路径、锚点、mailto 和无协议冒号的相对路径。
+ *  javascript:/data: 等一律拒绝——这是预览与访客热替换共用的管道，不能给注入留口子 */
+function safeUrl(u) {
+  var s = String(u || '').trim();
+  if (!s) return '';
+  if (/^(https?:\/\/|\/|#|mailto:)/i.test(s)) return s;
+  if (s.indexOf(':') === -1) return s; // 纯相对路径（无协议冒号）
+  return '';
+}
+
+/** 独立成行 <img> 按属性白名单重建：只保留 src/alt/style(max-width:N%)。
+ *  src 过 safeUrl；onerror/onload 等事件属性一律丢弃——自家图片块序列化格式可无损往返 */
+function safeImgTag(raw) {
+  function attr(name) {
+    var m = raw.match(new RegExp('\\b' + name + '\\s*=\\s*("([^"]*)"|\'([^\']*)\'|([^\\s>"\']+))', 'i'));
+    return m ? (m[2] != null ? m[2] : m[3] != null ? m[3] : m[4] || '') : null;
+  }
+  var src = attr('src');
+  if (!safeUrl(src)) {
+    // src 缺失或可疑：按纯文本展示原意图，不输出任何标签
+    return '<p>' + esc(raw.replace(/<\/?[^>]*>/g, '')) + '</p>';
+  }
+  var out = '<img src="' + esc(src) + '"';
+  var alt = attr('alt');
+  if (alt) out += ' alt="' + esc(alt) + '"';
+  var st = attr('style');
+  if (st) {
+    var mw = String(st).match(/max-width\s*:\s*\d+(\.\d+)?%/);
+    if (mw) out += ' style="' + mw[0] + '"';
+  }
+  return out + '>';
+}
 
 function renderMarkdown(src) {
   var lines = String(src || '').split('\n');
@@ -1055,8 +1140,14 @@ function renderMarkdown(src) {
   function inline(s) {
     s = esc(s);
     s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
-    s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, '<img src="$2" alt="$1">');
-    s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, function (m, alt, url) {
+      var u = safeUrl(url);
+      return u ? '<img src="' + u + '" alt="' + alt + '">' : alt; // 协议可疑 → 退回纯文本
+    });
+    s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (m, text, url) {
+      var u = safeUrl(url);
+      return u ? '<a href="' + u + '" target="_blank" rel="noopener">' + text + '</a>' : text;
+    });
     s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
     s = s.replace(/~~([^~]+)~~/g, '<del>$1</del>');
@@ -1077,11 +1168,11 @@ function renderMarkdown(src) {
       }
       continue;
     }
-    // 独立成行的 <img>（图片块设过宽度）原样透传——预览与线上渲染口径一致
-    if (!inCode && /^\s*<img\s/.test(line)) {
+    // 独立成行的 <img>（图片块设过宽度）：按属性白名单重建——预览与线上渲染口径一致，且事件属性进不来
+    if (!inCode && /^\s*<img\s/i.test(line)) {
       flushPara();
       flushList();
-      out.push(line.trim());
+      out.push(safeImgTag(line.trim()));
       continue;
     }
     if (inCode) {
@@ -1147,9 +1238,14 @@ function renderMarkdown(src) {
       }
       i--;
       var cells = rows.map(function (r) {
-        return r.split('|').slice(1, -1).map(function (c) {
-          return c.trim();
-        });
+        // 与小白模式 parseRow 同口径：无外边框不丢首尾列，\| 转义不切列
+        var t = String(r || '').trim();
+        var hasLeading = t.charAt(0) === '|';
+        var hasTrailing = t.length > 1 && t.charAt(t.length - 1) === '|' && t.slice(-2) !== '\\|';
+        var parts = t.split(/(?<!\\)\|/);
+        if (hasLeading) parts.shift();
+        if (hasTrailing) parts.pop();
+        return parts.map(function (c) { return c.trim().replace(/\\\|/g, '|'); });
       });
       var t = '<table><thead><tr>';
       cells[0].forEach(function (c) {
@@ -1253,10 +1349,11 @@ function parseBlocks(md) {
         var s = String(r || '').trim();
         var hasLeadingPipe = s.charAt(0) === '|';
         var hasTrailingPipe = s.length > 1 && s.charAt(s.length - 1) === '|' && s.slice(-2) !== '\\|';
-        var cells = s.split('|');
+        // 只在未被 \ 转义的 | 处切列：a\|b 是一个格子；切完再把 \| 还原成 |
+        var cells = s.split(/(?<!\\)\|/);
         if (hasLeadingPipe) cells.shift();
         if (hasTrailingPipe) cells.pop();
-        return cells.map(function (c) { return c.trim(); });
+        return cells.map(function (c) { return c.trim().replace(/\\\|/g, '|'); });
       };
       blocks.push({
         type: 'table',
@@ -1342,7 +1439,8 @@ function blocksToMarkdown(blocks) {
     }
     if (b.type === 'table') {
       var rows = (b.rows && b.rows.length) ? b.rows : [['', '']];
-      var cell = function (c) { return String(c == null ? '' : c).replace(/\|/g, '｜'); };
+      // 格子里的 | 用 \| 转义（GFM 标准），不再替换成全角 ｜——字节不变形，往返无损
+      var cell = function (c) { return String(c == null ? '' : c).replace(/\|/g, '\\|'); };
       var md = '| ' + rows[0].map(cell).join(' | ') + ' |';
       md += '\n| ' + rows[0].map(function () { return '---'; }).join(' | ') + ' |';
       rows.slice(1).forEach(function (r) {
@@ -2019,9 +2117,11 @@ function renderEditor(slug) {
     return;
   }
   renderShell('posts', loadingTip('正在捞这篇文章……'));
+  var seq = navSeq; // 路由竞态守卫：文章 GET 慢时用户可能已点去别的页面
   var load = slug === 'new' ? Promise.resolve(null) : api('GET', 'posts', { slug: slug });
   load
     .then(function (post) {
+      if (seq !== navSeq) return; // 迟到的编辑器不许盖掉当前页面
       var isNew = !post;
       var accent = post ? post.accent : 'pink';
       var html =
@@ -2140,6 +2240,7 @@ function bindEditor(origSlug, post) {
   ta.addEventListener('input', markDirty);
   editorGuard = {
     route: '#/editor/' + encodeURIComponent(origSlug),
+    askPending: false, // 确认弹窗在问时不再叠加第二层（nav 的 restoringHash 只能吞一次 hashchange）
     isDirty: function () {
       return dirty;
     },
@@ -2468,7 +2569,8 @@ function bindEditor(origSlug, post) {
       confirmModal(
         '发现自动暂存的草稿',
         '上次编辑到 ' + new Date(ad.at).toLocaleString() + ' 的内容已自动暂存。要恢复吗？（选取消就丢弃暂存）',
-        '恢复'
+        '恢复',
+        { maskCancellable: false } // 点遮罩不关闭：随手一点不该被当成"取消"把暂存删了，按钮/Esc 才算数
       ).then(function (yes) {
         if (!yes) {
           localStorage.removeItem(AUTODRAFT_KEY);
@@ -2484,6 +2586,7 @@ function bindEditor(origSlug, post) {
         }
         localStorage.setItem('cms-editor-mode', easyMode ? 'easy' : 'pro');
         applyMode();
+        if (!easyMode) refreshPreview(); // 进阶模式的预览不走 applyMode 的刷新分支，这里补上
         dirty = true;
         pushHist();
         toast('已恢复上次暂存的内容');
@@ -2531,6 +2634,7 @@ function bindEditor(origSlug, post) {
     }
     var btn = this;
     btn.disabled = true;
+    var saveSeq = navSeq; // 保存飞行期间用户可能已切走：DOM 补位与跳转都要核对
     var kvMode = !!state.kvAvailable && flushMode() !== 'immediate';
     $('#save-state').textContent = kvMode ? '正在保存……' : '正在提交到 GitHub……';
     api('PUT', 'posts', {
@@ -2555,6 +2659,7 @@ function bindEditor(origSlug, post) {
         editorGuard = null; // 保存成功后的跳转不拦截
         lastSavedAt = Date.now();
         localStorage.removeItem('cms-autodraft');
+        state.postsCache = null; // 列表与媒体库引用计数按新内容重取
         // 记下最近保存的文章，仪表盘出「继续上次编辑」直达入口
         try {
           localStorage.setItem(LAST_EDIT_KEY, JSON.stringify({ slug: slug, title: $('#f-title').value.trim(), at: Date.now() }));
@@ -2574,12 +2679,15 @@ function bindEditor(origSlug, post) {
           toast('已保存，站点构建约需一分钟');
         }
         if (autodraftTimer) { clearInterval(autodraftTimer); autodraftTimer = null; }
-        location.hash = '#/posts';
+        // 保存飞行期间用户若已自己切走（路由序号变了），就不把人拽回文章列表
+        if (saveSeq === navSeq) location.hash = '#/posts';
       })
       .catch(function (err) {
         toast(err.message, true);
+        if (saveSeq !== navSeq) return; // 页面已切走，DOM 补位没有意义（401 时编辑器 DOM 也已不在）
         btn.disabled = false;
-        $('#save-state').textContent = '';
+        var saveState = $('#save-state');
+        if (saveState) saveState.textContent = '';
       });
   });
 
@@ -2650,6 +2758,7 @@ function bindEditor(origSlug, post) {
 // ---------- 媒体库 ----------
 
 function renderMedia() {
+  var seq = navSeq; // 路由竞态守卫
   renderShell('media', loadingTip('媒体库打开中……'));
   // 引用计数的数据源与删图检查同口径（含草稿）；列表拿不到就降级隐藏徽标，不挡媒体库
   var postsReady =
@@ -2670,6 +2779,7 @@ function renderMedia() {
       });
     })
     .then(function (both) {
+      if (seq !== navSeq) return; // 媒体列表回来时页面可能已切走
       var images = both.data.images || [];
       var MEDIA_PAGE_SIZE = 24; // 每页张数；不足一页时分页控件完全不渲染（负优化禁令）
       var mPage = 1;
@@ -3415,6 +3525,7 @@ function uploadFiles(files) {
   if (!files.length) return;
   var total = files.length;
   var done = 0;
+  var upSeq = navSeq; // 上传是长链条：完成时用户可能已经切去写文章了
   toast('正在压缩并上传 ' + total + ' 张图片……');
   var chain = Promise.resolve();
   Array.prototype.forEach.call(files, function (f) {
@@ -3435,7 +3546,8 @@ function uploadFiles(files) {
       });
   });
   chain.then(function () {
-    renderMedia();
+    // 只在用户还停在媒体库时才重渲染；别把正在打字的编辑器整页拽回媒体库
+    if (upSeq === navSeq && (location.hash || '#/dashboard') === '#/media') renderMedia();
   });
 }
 

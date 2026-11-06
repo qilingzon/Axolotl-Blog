@@ -125,7 +125,9 @@ async function issueToken(user) {
 
 async function verifyToken(token) {
   if (!token || !token.includes('.')) return null;
-  const [payload, sig] = token.split('.');
+  const parts = token.split('.');
+  if (parts.length !== 2) return null; // 严格两段：尾随垃圾不放过
+  const [payload, sig] = parts;
   const expect = b64uEncode(await hmacSign(payload));
   if (!safeEqual(sig, expect)) return null;
   try {
@@ -405,12 +407,15 @@ function normalizeDate(v) {
 }
 
 function normalizeMeta(raw) {
+  // 换行防线：字符串字段里混入 \r\n 会让 serializeFrontmatter 的单引号 YAML 断成多行，
+  // 行首 --- 会被解析器当文档分隔符，Astro 构建全站失败——一律压成空格
+  const clean = (s) => String(s == null ? '' : s).replace(/[\r\n]+/g, ' ').trim();
   return {
-    title: String(raw.title || '').slice(0, 120),
-    description: String(raw.description || '').slice(0, 300),
+    title: clean(raw.title).slice(0, 120),
+    description: clean(raw.description).slice(0, 300),
     pubDate: normalizeDate(raw.pubDate),
     tags: (Array.isArray(raw.tags) ? raw.tags : [])
-      .map((t) => String(t).trim())
+      .map((t) => clean(t))
       .filter(Boolean)
       .slice(0, 8),
     accent: ACCENTS.includes(raw.accent) ? raw.accent : 'pink',
@@ -517,6 +522,24 @@ async function kvForgetPost(kv, slug) {
     delete pend[slug];
     await kvWritePend(kv, pend);
   }
+}
+
+const KV_RENAMES_KEY = 'renames';
+
+/** 改名账本 {新slug: 旧slug}：攒批改名时仓库旧文件还在，flush 入库时必须在同一个 commit 里删掉它，否则双份文章 */
+async function kvReadRenames(kv) {
+  try {
+    const raw = await kv.get(KV_RENAMES_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed && typeof parsed === 'object') return parsed;
+  } catch {
+    // 账本坏了按空处理（最多退化为"改名列表里双份"，不挡保存）
+  }
+  return {};
+}
+
+async function kvWriteRenames(kv, renames) {
+  await kv.put(KV_RENAMES_KEY, JSON.stringify(renames));
 }
 
 /** 纯函数（selftest 覆盖）：仓库列表与未入库条目合并——pending 覆盖同 slug、新篇追加并标 pending */
@@ -628,8 +651,18 @@ async function handlePostItem(method, slug, request) {
       throw e;
     });
     if (!item) {
-      const raw = await kv.get(kvPostKey(slug));
-      const v = JSON.parse(raw);
+      const raw = await kv.get(kvPostKey(slug)).catch(() => null);
+      let v = null;
+      try {
+        v = raw ? JSON.parse(raw) : null;
+      } catch {
+        v = null; // 快照损坏按不存在处理，不让 500 挡住整个编辑器
+      }
+      if (!v) {
+        const err = new Error('文章不存在');
+        err.status = 404;
+        throw err;
+      }
       return json({ slug, sha: '', pending: true, ...normalizeMeta(v.meta), body: String(v.body || '') });
     }
     const text = dec.decode(b64ToBytes(item.content || ''));
@@ -638,8 +671,13 @@ async function handlePostItem(method, slug, request) {
     // 攒批中的文章优先回 KV 快照：编辑器必须显示用户最新保存的版本，而不是仓库里的上一版
     if (pend[slug]) {
       const raw = await kv.get(kvPostKey(slug)).catch(() => null);
-      if (raw) {
-        const v = JSON.parse(raw);
+      let v = null;
+      try {
+        v = raw ? JSON.parse(raw) : null;
+      } catch {
+        v = null;
+      }
+      if (v) {
         return json({ slug, sha: item.sha, pending: true, ...normalizeMeta(v.meta), body: String(v.body || '') });
       }
     }
@@ -666,12 +704,20 @@ async function handlePostItem(method, slug, request) {
       throw e;
     });
     const isNew = !existing;
-    // 撞名保护：目标已存在且不是同一篇（改名撞别人 / 新建撞旧文）→ 拒绝，绝不静默覆盖
+    // 撞名保护：目标已存在且不是同一篇（改名撞别人 / 新建撞旧文）→ 拒绝，绝不静默覆盖。
+    // 例外：攒批里刚把 slug 改成了 oldSlug（改名账本可查），现在改回原名是合法的
+    const kv = kvStore();
     if (existing && oldSlug !== slug) {
-      return fail('该文件名已被占用，请换一个再保存', 409);
+      const renames = kv ? await kvReadRenames(kv).catch(() => ({})) : {};
+      if (renames[slug] !== oldSlug) {
+        return fail('该文件名已被占用，请换一个再保存', 409);
+      }
+      // 合法改回原名：旧名快照与账本一并清掉，后面按"更新 existing"走
+      await kvForgetPost(kv, oldSlug);
+      delete renames[slug];
+      await kvWriteRenames(kv, renames);
     }
 
-    const kv = kvStore();
     if (kv && (saveMode === 'batch' || saveMode === 'all')) {
       // 改名且旧篇尚未入库（纯 KV 态）→ 只搬 KV，不碰 git、不触发构建
       if (oldSlug && oldSlug !== slug && SLUG_RE.test(oldSlug) && isNew) {
@@ -679,8 +725,20 @@ async function handlePostItem(method, slug, request) {
         if (!oldInRepo) {
           const pending = await kvSavePost(kv, slug, meta, body, html);
           await kvForgetPost(kv, oldSlug);
+          // 链式改名（X→Y→Z）：把账本里挂在 Y 名下的旧名 X 转记到 Z，flush 才能删对文件
+          const renames = await kvReadRenames(kv);
+          const chainOld = renames[oldSlug];
+          if (chainOld && chainOld !== slug) {
+            delete renames[oldSlug];
+            renames[slug] = chainOld;
+            await kvWriteRenames(kv, renames);
+          }
           return json({ ok: true, slug, created: true, kv: true, pending });
         }
+        // 旧篇已在仓库：记入改名账本，flush 入库时在同一个 commit 里删旧文件（否则双份文章）
+        const renames = await kvReadRenames(kv);
+        renames[slug] = oldSlug;
+        await kvWriteRenames(kv, renames);
       }
       if (isNew && saveMode !== 'all') {
         // 新文章：没有静态页就无法热替换，攒批只会让它迟迟不可见 → 立即入库（1 次构建）
@@ -694,12 +752,34 @@ async function handlePostItem(method, slug, request) {
 
     // 现状路径（未绑 KV 或「即时」模式）：行为与历史版本逐字一致
     const warn = await commitPostToRepo(slug, content, meta, existing, oldSlug);
+    if (kv) {
+      // 已入库的内容必须清掉残留攒批快照：否则下次 flush 会拿旧快照把刚提交的内容回滚回去
+      await kvForgetPost(kv, slug);
+      if (oldSlug && oldSlug !== slug && SLUG_RE.test(oldSlug)) await kvForgetPost(kv, oldSlug);
+      // 攒批时改过名、现在用即时模式保存：账本里挂着的仓库旧文件随保存一并清掉
+      const renames = await kvReadRenames(kv);
+      const ledgerOld = renames[slug];
+      if (ledgerOld && SLUG_RE.test(ledgerOld)) {
+        const ledgerPath = `${POSTS_DIR}/${ledgerOld}.md`;
+        const ledgerFile = await ghFetch(repoSegments('contents', ledgerPath)).catch(() => null);
+        if (ledgerFile) {
+          await ghFetch(repoSegments('contents', ledgerPath), {
+            method: 'DELETE',
+            body: { message: `CMS: 清理改名旧文件 ${ledgerOld}`, sha: ledgerFile.sha, branch: CFG.branch() },
+          }).catch(() => {});
+        }
+        delete renames[slug];
+        await kvWriteRenames(kv, renames);
+      }
+    }
     return json({ ok: true, slug, created: isNew, ...(warn ? { warn } : {}) });
   }
 
   if (method === 'DELETE') {
     const kv = kvStore();
-    await (kv ? kvForgetPost(kv, slug) : Promise.resolve());
+    // 攒批里刚改过名的：旧文件还躺在仓库，删新名时必须把旧名一并删掉，否则旧文复活
+    const renames = kv ? await kvReadRenames(kv).catch(() => ({})) : {};
+    const repoOld = renames[slug] && SLUG_RE.test(renames[slug]) ? renames[slug] : '';
     const item = await ghFetch(repoSegments('contents', filePath)).catch((e) => {
       if (e.status === 404) {
         // 仓库里本来就没有（攒批中的新文章）：纯 KV 删除，零构建
@@ -708,16 +788,34 @@ async function handlePostItem(method, slug, request) {
       }
       throw e;
     });
-    if (!item) return json({ ok: true, kvOnly: true });
-    const { meta } = parseFrontmatter(dec.decode(b64ToBytes(item.content || '')));
-    await ghFetch(repoSegments('contents', filePath), {
-      method: 'DELETE',
-      body: {
-        message: `CMS: 删除《${meta.title || slug}》`,
-        sha: item.sha,
-        branch: CFG.branch(),
-      },
-    });
+    if (!item && !repoOld) {
+      await (kv ? kvForgetPost(kv, slug) : Promise.resolve());
+      return json({ ok: true, kvOnly: true });
+    }
+    // 先删 git 再清 KV：git 删除失败时攒批快照还在，重试不丢未入库的编辑
+    const targets = [];
+    if (item) {
+      const { meta } = parseFrontmatter(dec.decode(b64ToBytes(item.content || '')));
+      targets.push({ path: filePath, sha: item.sha, title: meta.title || slug });
+    }
+    if (repoOld) {
+      const oldFile = await ghFetch(repoSegments('contents', `${POSTS_DIR}/${repoOld}.md`)).catch(() => null);
+      if (oldFile) targets.push({ path: `${POSTS_DIR}/${repoOld}.md`, sha: oldFile.sha, title: repoOld });
+    }
+    for (const t of targets) {
+      await ghFetch(repoSegments('contents', t.path), {
+        method: 'DELETE',
+        body: { message: `CMS: 删除《${t.title}》`, sha: t.sha, branch: CFG.branch() },
+      });
+    }
+    if (kv) {
+      await kvForgetPost(kv, slug);
+      if (repoOld) {
+        const latestRenames = await kvReadRenames(kv);
+        delete latestRenames[slug];
+        await kvWriteRenames(kv, latestRenames);
+      }
+    }
     return json({ ok: true });
   }
 
@@ -737,10 +835,14 @@ async function handlePostsFlush() {
   const pend = await kvReadPend(kv);
   const slugs = Object.keys(pend).filter((s) => SLUG_RE.test(s));
   if (!slugs.length) return json({ ok: true, committed: 0 });
-  if (slugs.length > 50) return fail('一次最多入库 50 篇，请分批处理');
+  // 单个 commit 最多带 50 个文件改动；超出部分留在 pend 下次入库，不会永久卡死
+  const batch = slugs.slice(0, 50);
+  // 记下入库开始时每篇的 pend 时间戳：flush 期间又被保存过的，收尾时不能删它的快照
+  const atFlush = {};
+  for (const s of batch) atFlush[s] = pend[s];
 
   const items = [];
-  for (const s of slugs) {
+  for (const s of batch) {
     const raw = await kv.get(kvPostKey(s)).catch(() => null);
     if (!raw) continue;
     try {
@@ -755,9 +857,20 @@ async function handlePostsFlush() {
   }
   if (!items.length) {
     const latestPend = await kvReadPend(kv);
-    for (const s of slugs) delete latestPend[s];
+    for (const s of batch) delete latestPend[s];
     await kvWritePend(kv, latestPend);
     return json({ ok: true, committed: 0 });
+  }
+
+  // 攒批改名账本：入库的同一个 commit 里删掉仓库旧文件（tree 里 sha=null 即删除）
+  const renames = await kvReadRenames(kv);
+  for (const it of items) {
+    const ledgerOld = renames[it.slug];
+    if (ledgerOld && SLUG_RE.test(ledgerOld) && ledgerOld !== it.slug) {
+      const oldPath = `${POSTS_DIR}/${ledgerOld}.md`;
+      const oldFile = await ghFetch(repoSegments('contents', oldPath)).catch(() => null);
+      if (oldFile) it.deletePath = oldPath;
+    }
   }
 
   const ref = await ghFetch(repoSegments('git', 'ref', 'heads', CFG.branch()));
@@ -771,6 +884,7 @@ async function handlePostsFlush() {
       body: { content: it.content, encoding: 'base64' },
     });
     entries.push({ path: `${POSTS_DIR}/${it.slug}.md`, mode: '100644', type: 'blob', sha: blob.sha });
+    if (it.deletePath) entries.push({ path: it.deletePath, mode: '100644', type: 'blob', sha: null });
   }
   const tree = await ghFetch(repoSegments('git', 'trees'), {
     method: 'POST',
@@ -789,11 +903,23 @@ async function handlePostsFlush() {
     if (e.status === 422) return fail('刚才有其他改动先入库了，请重试一次入库', 409);
     throw e;
   }
-  for (const it of items) await kv.delete(kvPostKey(it.slug)).catch(() => {});
+  // 收尾只清"入库期间没再被保存过"的快照：时间戳变了说明 KV 里有更新版本，留给下次入库
   const latestPend = await kvReadPend(kv);
-  for (const it of items) delete latestPend[it.slug];
+  for (const it of items) {
+    if (latestPend[it.slug] !== undefined && latestPend[it.slug] !== atFlush[it.slug]) continue;
+    await kv.delete(kvPostKey(it.slug)).catch(() => {});
+    delete latestPend[it.slug];
+  }
   await kvWritePend(kv, latestPend);
-  return json({ ok: true, committed: items.length, slugs: items.map((i) => i.slug) });
+  const latestRenames = await kvReadRenames(kv);
+  for (const it of items) delete latestRenames[it.slug];
+  await kvWriteRenames(kv, latestRenames);
+  return json({
+    ok: true,
+    committed: items.length,
+    slugs: items.map((i) => i.slug),
+    ...(slugs.length > items.length ? { remaining: slugs.length - items.length } : {}),
+  });
 }
 
 /** git ref 白名单：仅接受 commit sha（7-40 位十六进制），防任意 ref/分支注入 */
@@ -1019,10 +1145,17 @@ async function handleUploadMedia(request) {
   if (!IMG_NAME_RE.test(name)) return fail('文件名不合法（仅支持 png/jpg/webp/gif/avif）');
   const data = String((input && input.data) || '');
   if (!data) return fail('缺少图片数据');
+  // 约 5MB 原始字节（base64 后 ~6.7MB）为上限：挡住异常大包打爆 KV，也拦下随手传原图的失误
+  if (data.length > 7 * 1024 * 1024) return fail('图片太大（上限约 5MB），请压缩后再上传', 413);
   const kv = kvStore();
   if (kv) {
     // 零构建路径：字节进 KV，不走 git，站点不用重新构建
-    const bytes = b64ToBytes(data);
+    let bytes;
+    try {
+      bytes = b64ToBytes(data);
+    } catch {
+      return fail('图片数据不是合法的 base64，请重新选择文件上传', 400);
+    }
     const idx = await kvReadIndex(kv);
     const overwritten = !!idx[name];
     await kv.put(kvImageKey(name), bytes);
@@ -1068,7 +1201,24 @@ async function handleRenameMedia(request, url) {
   const toPath = `${MEDIA_DIR}/${to}`;
 
   const posts = await fetchAllPosts();
-  const refs = posts.filter((p) => postRefsImage(p.body, from));
+  const candidates = posts.map((p) => ({ title: p.title, body: p.body }));
+  // 攒批未入库的文章也可能引用图片（/m/ 路径），把 KV 快照正文一并纳入扫描（口径与列表合并视图一致）
+  const kv = kvStore();
+  if (kv) {
+    const pend = await kvReadPend(kv).catch(() => ({}));
+    for (const s of Object.keys(pend)) {
+      if (!SLUG_RE.test(s)) continue;
+      const raw = await kv.get(kvPostKey(s)).catch(() => null);
+      if (!raw) continue;
+      try {
+        const v = JSON.parse(raw);
+        candidates.push({ title: (v.meta && v.meta.title) || s, body: String(v.body || '') });
+      } catch {
+        // 快照损坏跳过
+      }
+    }
+  }
+  const refs = candidates.filter((p) => postRefsImage(p.body, from));
   if (refs.length) {
     return fail(
       `有 ${refs.length} 篇文章正在引用它（${refs
@@ -1079,18 +1229,18 @@ async function handleRenameMedia(request, url) {
   }
 
   // KV 分支：图片在 KV 里（零构建上传的）→ 值拷到新 key、删旧 key、改索引，全程不碰 git
-  const kv = kvStore();
   const kvBytes = kv ? await kv.get(kvImageKey(from), { type: 'arrayBuffer' }).catch(() => null) : null;
   if (kv && kvBytes) {
-    const clash = await kv.get(kvImageKey(to)).catch(() => null);
-    if (clash !== null) return fail('已有同名图片，请换一个名字', 409);
+    // 同名冲突按索引判定：上次改名半途失败留下的孤儿字节（有 key 无索引）可以直接覆盖完成，不会 409 卡死
+    const idx0 = await kvReadIndex(kv);
+    if (idx0[to]) return fail('已有同名图片，请换一个名字', 409);
     await kv.put(kvImageKey(to), kvBytes);
-    await kv.delete(kvImageKey(from));
-    const idx = await kvReadIndex(kv);
-    const meta = idx[from] || {};
-    delete idx[from];
-    idx[to] = { name: to, size: meta.size || 0, at: meta.at || Date.now() };
-    await kvWriteIndex(kv, idx);
+    // 旧 key 删除失败只留孤儿字节，不再让整个改名 500——索引以新名为准
+    await kv.delete(kvImageKey(from)).catch(() => {});
+    const meta = idx0[from] || {};
+    delete idx0[from];
+    idx0[to] = { name: to, size: meta.size || 0, at: meta.at || Date.now() };
+    await kvWriteIndex(kv, idx0);
     return json({ ok: true, name: to, url: '/m/' + to, kv: true });
   }
 

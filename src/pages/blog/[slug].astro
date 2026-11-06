@@ -81,7 +81,9 @@ const BUILD_TIME = Date.now();
             return r.ok ? r.json() : null;
           })
           .then(function (d) {
-            if (!d || !d.at || d.at <= builtAt || !d.html) return;
+            // typeof 严格校验：字符串 "abc" 与 builtAt 比较得 NaN 会绕过 <= 守卫；
+            // d.draft = 作者勾了草稿：这是编辑中版本，绝不能热替换给访客，保持构建版
+            if (!d || typeof d.at !== 'number' || d.at <= builtAt || !d.html || d.draft) return;
             var bodyEl = document.querySelector('.post__body');
             if (bodyEl) bodyEl.innerHTML = d.html;
             var titleEl = document.querySelector('.post__title');
