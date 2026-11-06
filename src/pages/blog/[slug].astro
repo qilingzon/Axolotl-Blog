@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Axolotl from '../../components/Axolotl.astro';
+import { SITE } from '../../config';
 import { getCollection, render } from 'astro:content';
 
 export async function getStaticPaths() {
@@ -71,8 +72,8 @@ const BUILD_TIME = Date.now();
       }
     </nav>
   </article>
-  <script is:inline define:vars={{ slug: post.id, builtAt: BUILD_TIME }}>
-    // KV 热替换探针：攒批保存的最新版晚于本页构建时刻时，原位换正文与标题。
+  <script is:inline define:vars={{ slug: post.id, builtAt: BUILD_TIME, siteName: SITE.name }}>
+    // KV 热替换探针：攒批保存的最新版晚于本页构建时刻时，原位换正文/标题/日期/标签。
     // 探针是纯增强——KV 未绑/请求失败/版本不比构建新，页面都保持构建版原样
     (function () {
       try {
@@ -89,7 +90,39 @@ const BUILD_TIME = Date.now();
             var titleEl = document.querySelector('.post__title');
             if (titleEl && d.title) {
               titleEl.textContent = d.title;
-              document.title = d.title;
+              document.title = d.title + ' · ' + siteName;
+            }
+            // 日期同步：正文换了日期还挂着构建时的旧值会张冠李戴
+            if (d.pubDate) {
+              var timeEl = document.querySelector('time[datetime]');
+              var dt = new Date(d.pubDate);
+              if (timeEl && !isNaN(dt.getTime())) {
+                timeEl.setAttribute('datetime', dt.toISOString());
+                timeEl.textContent = dt.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+              }
+            }
+            // 标签同步：重建 .post__tags（新标签空则整个摘除，与构建口径一致）
+            if (Array.isArray(d.tags)) {
+              var headEl = document.querySelector('.post__meta');
+              var tagsEl = document.querySelector('.post__tags');
+              if (headEl) {
+                if (d.tags.length) {
+                  if (!tagsEl) {
+                    tagsEl = document.createElement('div');
+                    tagsEl.className = 'post__tags';
+                    headEl.appendChild(tagsEl);
+                  }
+                  while (tagsEl.firstChild) tagsEl.removeChild(tagsEl.firstChild);
+                  d.tags.forEach(function (t) {
+                    var s = document.createElement('span');
+                    s.className = 'tag';
+                    s.textContent = String(t);
+                    tagsEl.appendChild(s);
+                  });
+                } else if (tagsEl) {
+                  tagsEl.remove();
+                }
+              }
             }
           })
           .catch(function () {});

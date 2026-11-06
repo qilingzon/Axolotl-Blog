@@ -3,6 +3,7 @@
 // 不进任何列表/搜索/sitemap；noindex,nofollow 不入搜索引擎索引；知道直链才能访问（个人站可接受的隐蔽性）。
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Axolotl from '../../components/Axolotl.astro';
+import { SITE } from '../../config';
 import { getCollection, render } from 'astro:content';
 
 export async function getStaticPaths() {
@@ -51,8 +52,9 @@ const BUILD_TIME = Date.now();
       <Content />
     </div>
   </article>
-  <script is:inline define:vars={{ slug: post.id, builtAt: BUILD_TIME }}>
-    // KV 热替换探针（与 blog/[slug] 同机制）：攒批保存的草稿新版晚于构建时刻时原位替换
+  <script is:inline define:vars={{ slug: post.id, builtAt: BUILD_TIME, siteName: SITE.name }}>
+    // KV 热替换探针（与 blog/[slug] 同机制）：攒批保存的草稿新版晚于构建时刻时原位替换。
+    // 这里是作者私密预览页，草稿内容照常替换（预览草稿本就是这个页面的职责）
     (function () {
       try {
         fetch('/p/' + encodeURIComponent(slug) + '?fmt=json')
@@ -60,15 +62,45 @@ const BUILD_TIME = Date.now();
             return r.ok ? r.json() : null;
           })
           .then(function (d) {
-            // typeof 严格校验：非数字 at 与 builtAt 比较得 NaN 会绕过 <= 守卫。
-            // 这里是作者私密预览页，草稿内容照常替换（预览草稿本就是这个页面的职责）
+            // typeof 严格校验：非数字 at 与 builtAt 比较得 NaN 会绕过 <= 守卫
             if (!d || typeof d.at !== 'number' || d.at <= builtAt || !d.html) return;
             var bodyEl = document.querySelector('.post__body');
             if (bodyEl) bodyEl.innerHTML = d.html;
             var titleEl = document.querySelector('.post__title');
             if (titleEl && d.title) {
               titleEl.textContent = d.title;
-              document.title = d.title;
+              document.title = d.title + ' · ' + siteName;
+            }
+            // 日期与标签同步（口径与文章页一致）
+            if (d.pubDate) {
+              var timeEl = document.querySelector('time[datetime]');
+              var dt = new Date(d.pubDate);
+              if (timeEl && !isNaN(dt.getTime())) {
+                timeEl.setAttribute('datetime', dt.toISOString());
+                timeEl.textContent = dt.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+              }
+            }
+            if (Array.isArray(d.tags)) {
+              var headEl = document.querySelector('.post__meta');
+              var tagsEl = document.querySelector('.post__tags');
+              if (headEl) {
+                if (d.tags.length) {
+                  if (!tagsEl) {
+                    tagsEl = document.createElement('div');
+                    tagsEl.className = 'post__tags';
+                    headEl.appendChild(tagsEl);
+                  }
+                  while (tagsEl.firstChild) tagsEl.removeChild(tagsEl.firstChild);
+                  d.tags.forEach(function (t) {
+                    var s = document.createElement('span');
+                    s.className = 'tag';
+                    s.textContent = String(t);
+                    tagsEl.appendChild(s);
+                  });
+                } else if (tagsEl) {
+                  tagsEl.remove();
+                }
+              }
             }
           })
           .catch(function () {});

@@ -95,6 +95,29 @@ const MIME = {
 createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
+    // 仅本地 E2E：CMS_DEV_KV_SEED=1 时开放 KV 垫片写入口（默认关闭，零默认行为变化；线上无此代码）。
+    // 用途：往垫片塞文章快照，让 /blog/ 页探针跑真实热替换链路。POST body: {key, value}
+    if (process.env.CMS_DEV_KV_SEED === '1' && url.pathname === '/__dev-kv' && req.method === 'POST') {
+      const chunks = [];
+      req.on('data', (c) => chunks.push(c));
+      req.on('end', async () => {
+        try {
+          const { key, value } = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+          if (!key || typeof value !== 'string') {
+            res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end('需要 {key, value}');
+            return;
+          }
+          await env.CMS_KV.put(key, value);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end('{"ok":true}');
+        } catch (err) {
+          res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end('种子写入失败：' + (err && err.message));
+        }
+      });
+      return;
+    }
     // /p/<slug>：攒批文章路由（json 快照 / 预览页）——直接走线上 onRequestGet 真实现
     if (url.pathname.startsWith('/p/')) {
       const slug = decodeURIComponent(url.pathname.slice(3));

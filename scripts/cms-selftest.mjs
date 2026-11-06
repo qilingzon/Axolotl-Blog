@@ -437,7 +437,7 @@ t('/p/?fmt=json 带出 draft 标志且 no-store（草稿门禁的数据源半边
   // slug 'draft-post' 的十六进制 key 与 prod kvPostKey 同构（p_ 前缀）
   const hex = (s) => Buffer.from(s, 'utf8').toString('hex');
   await kv.put('p_' + hex('draft-post'), JSON.stringify({ slug: 'draft-post', meta: { title: '草稿文', draft: true, pubDate: '2026-11-06T00:00:00.000Z' }, body: 'x', html: '<p>y</p>', at: 123 }));
-  await kv.put('p_' + hex('live-post'), JSON.stringify({ slug: 'live-post', meta: { title: '正式文', draft: false, pubDate: '2026-11-06T00:00:00.000Z' }, body: 'x', html: '<p>y</p>', at: 456 }));
+  await kv.put('p_' + hex('live-post'), JSON.stringify({ slug: 'live-post', meta: { title: '正式文', draft: false, pubDate: '2026-11-06T00:00:00.000Z', tags: ['测试'] }, body: 'x', html: '<p>y</p>', at: 456 }));
   const call = (slug) =>
     mod.onRequestGet({
       params: { slug },
@@ -449,6 +449,9 @@ t('/p/?fmt=json 带出 draft 标志且 no-store（草稿门禁的数据源半边
   assert.equal(dDraft.title, '草稿文');
   const dLive = await (await call('live-post')).json();
   assert.equal(dLive.draft, false);
+  // 热替换元数据同步：日期与标签随快照透出（探针据此更新 <time> 与 .post__tags）
+  assert.equal(dLive.pubDate, '2026-11-06T00:00:00.000Z');
+  assert.deepEqual(dLive.tags, ['测试']);
   const headers = (await call('live-post')).headers;
   assert.match(headers.get('cache-control') || '', /no-store/);
 });

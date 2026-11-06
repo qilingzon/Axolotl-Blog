@@ -114,6 +114,8 @@ export async function onRequestGet(context) {
         title: String(meta.title || slug),
         html: String(v.html || ''),
         draft: meta.draft === true, // 草稿标志：公开文章页探针见到必须跳过，不能把草稿推给访客
+        pubDate: String(meta.pubDate || ''), // 热替换同步日期：只换正文不换日期会张冠李戴
+        tags: Array.isArray(meta.tags) ? meta.tags.map(String).slice(0, 8) : [],
       }),
       { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } }
     );
