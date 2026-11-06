@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20261106T175716167Z-35528-1aaf22ad919a",
+  "runId": "20261106T175716167Z-35528-1aaf22ad919a",
+  "runStatus": "completed",
+  "coverage": {
+    "status": "complete",
+    "reasons": []
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "37970629885f08a3d5de601770e2b7f9aa09b378",
+  "diffHash": "98c70003c7b8b8f3b41f172420a4120de8efaf047986585c98ab382520b099f1",
+  "rulesVersion": "unavailable",
+  "sessionHash": "4e9fb982349d982c92323ef867fda797c76f2fe8f49f24770846f94cb127d887",
+  "reportRef": ".mimosa/reports/task-review-session_525068c1be63144f73c4467647e628f8-20261106T175716167Z-35528-1aaf22ad919a.json",
+  "events": [
+    {
+      "eventId": "hook-287a9a4b7bd470c1fb31ad674f9dc955",
+      "findingId": "mimosa-bdd1ae1b25fc776acee09118",
+      "type": "finding_observed",
+      "at": "2026-11-06T17:57:16.167Z",
+      "identity": {
+        "projectRelativeFile": ".github/workflows/test.yml",
+        "ruleId": "mimosa.supply.ci-npm-install",
+        "codeEvidenceHash": "966abd04566d9aa4922120f339f62827387702d4cd7fd16bd0f696947cb4955c",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 20,
+      "endLine": 20,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "966abd04566d9aa4922120f339f62827387702d4cd7fd16bd0f696947cb4955c"
+      },
+      "sequence": 0
+    },
+    {
+      "eventId": "hook-4ded13a982c49f4974c3c38d9528a0a9",
+      "findingId": "mimosa-59d6a627a5db23c30d4872fe",
+      "type": "finding_observed",
+      "at": "2026-11-06T17:57:16.167Z",
+      "identity": {
+        "projectRelativeFile": "package.json",
+        "ruleId": "mimosa.supply.version-range",
+        "codeEvidenceHash": "1b8473a05535c4ce8dc61e75b95265ff36eeb89fc107062bc77e298cbcc0165e",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 14,
+      "endLine": 14,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "1b8473a05535c4ce8dc61e75b95265ff36eeb89fc107062bc77e298cbcc0165e"
+      },
+      "sequence": 1
+    }
+  ],
+  "observedFindingIds": [],
+  "verifiedFiles": [
+    {
+      "file": "public/admin/app.js",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "edge-functions/api/[[default]].js",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "edge-functions/m/[name].js",
+      "direct": "complete",
+      "projectContext": "partial"
+    }
+  ],
+  "recordedAt": "2026-11-06T17:57:16.564Z"
+}

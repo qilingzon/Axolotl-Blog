@@ -1,14 +1,14 @@
 {
   "schemaVersion": "mimosa-hook-status/v1",
-  "recordedAt": "2026-11-06T17:53:50.451Z",
+  "recordedAt": "2026-11-06T18:11:59.160Z",
   "sessionId": "session_525068c1be63144f73c4467647e628f8",
   "event": "PostToolUse",
   "toolName": "Edit",
-  "file": "public/admin/app.js",
+  "file": "astro.config.mjs",
   "outcome": "clear",
   "coverage": "complete",
   "findingCount": 0,
-  "durationMs": 18,
+  "durationMs": 5,
   "hostState": "hook_complete",
   "reportHint": ".mimosa/reports/"
 }

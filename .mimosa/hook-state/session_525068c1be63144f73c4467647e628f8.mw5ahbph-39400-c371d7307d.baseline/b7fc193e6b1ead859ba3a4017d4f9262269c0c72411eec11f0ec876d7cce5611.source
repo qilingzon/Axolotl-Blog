@@ -705,23 +705,35 @@ async function handlePostItem(method, slug, request) {
     });
     const isNew = !existing;
     // 撞名保护：目标已存在且不是同一篇（改名撞别人 / 新建撞旧文）→ 拒绝，绝不静默覆盖。
-    // 例外：攒批里刚把 slug 改成了 oldSlug（改名账本可查），现在改回原名是合法的
+    // 例外：攒批里刚把 slug 改成了 oldSlug（账本 renames[oldSlug]===slug 可查），现在改回原名是合法的
     const kv = kvStore();
     if (existing && oldSlug !== slug) {
       const renames = kv ? await kvReadRenames(kv).catch(() => ({})) : {};
-      if (renames[slug] !== oldSlug) {
+      if (renames[oldSlug] !== slug) {
         return fail('该文件名已被占用，请换一个再保存', 409);
       }
-      // 合法改回原名：旧名快照与账本一并清掉，后面按"更新 existing"走
+      // 合法改回原名：旧名的快照与账本条目一并清掉，后面按"更新 existing"走
       await kvForgetPost(kv, oldSlug);
-      delete renames[slug];
+      delete renames[oldSlug];
       await kvWriteRenames(kv, renames);
+    }
+    // 攒批占名保护：目标名被一篇纯 KV 攒批文章占着（仓库查不到）→ 同样拒绝，防静默覆盖成孤儿快照
+    if (kv && !existing && oldSlug !== slug) {
+      const pend0 = await kvReadPend(kv).catch(() => ({}));
+      if (pend0[slug] !== undefined) {
+        return fail('该文件名已被攒批中的文章占用，请先入库或换一个名字', 409);
+      }
     }
 
     if (kv && (saveMode === 'batch' || saveMode === 'all')) {
       // 改名且旧篇尚未入库（纯 KV 态）→ 只搬 KV，不碰 git、不触发构建
       if (oldSlug && oldSlug !== slug && SLUG_RE.test(oldSlug) && isNew) {
         const oldInRepo = await ghFetch(repoSegments('contents', `${POSTS_DIR}/${oldSlug}.md`)).catch(() => null);
+        // 目标名正被另一篇的攒批改名占用（X→Y 后 W→Y）→ 拒绝，防账本条目被覆盖丢删除记录
+        const renamesOcc = await kvReadRenames(kv);
+        if (renamesOcc[slug] && renamesOcc[slug] !== oldSlug) {
+          return fail('另一篇的攒批改名正占用这个名字，请先入库或换个名字', 409);
+        }
         if (!oldInRepo) {
           const pending = await kvSavePost(kv, slug, meta, body, html);
           await kvForgetPost(kv, oldSlug);
@@ -735,14 +747,23 @@ async function handlePostItem(method, slug, request) {
           }
           return json({ ok: true, slug, created: true, kv: true, pending });
         }
-        // 旧篇已在仓库：记入改名账本，flush 入库时在同一个 commit 里删旧文件（否则双份文章）
-        const renames = await kvReadRenames(kv);
-        renames[slug] = oldSlug;
-        await kvWriteRenames(kv, renames);
+        // 旧篇已在仓库：记入账本（flush 时同一 commit 删旧文件），并清掉旧名残留的攒批快照——
+        // 内容已由新名承接，旧 pend 条目留着会让 flush 把 stale 旧版又提交回仓库
+        renamesOcc[slug] = oldSlug;
+        await kvWriteRenames(kv, renamesOcc);
+        await kvForgetPost(kv, oldSlug);
       }
       if (isNew && saveMode !== 'all') {
         // 新文章：没有静态页就无法热替换，攒批只会让它迟迟不可见 → 立即入库（1 次构建）
         const warn = await commitPostToRepo(slug, content, meta, existing, oldSlug);
+        // 即时提交已连带处理旧文件：成功则账本条目不再需要；删除失败（warn 非空）则保留给下次 flush 兜底
+        if (!warn) {
+          const renames2 = await kvReadRenames(kv);
+          if (renames2[slug] === oldSlug) {
+            delete renames2[slug];
+            await kvWriteRenames(kv, renames2);
+          }
+        }
         return json({ ok: true, slug, created: true, ...(warn ? { warn } : {}) });
       }
       // 已发布文章的修改 / 「全攒」模式的新文章：写 KV 即时可见 + 记攒批，git 等打包
@@ -756,20 +777,33 @@ async function handlePostItem(method, slug, request) {
       // 已入库的内容必须清掉残留攒批快照：否则下次 flush 会拿旧快照把刚提交的内容回滚回去
       await kvForgetPost(kv, slug);
       if (oldSlug && oldSlug !== slug && SLUG_RE.test(oldSlug)) await kvForgetPost(kv, oldSlug);
-      // 攒批时改过名、现在用即时模式保存：账本里挂着的仓库旧文件随保存一并清掉
+      // 攒批时改过名、现在用即时模式保存：账本里挂着的仓库旧文件随保存一并清掉。
+      // 只有确认"旧文件已删掉或本来就不存在"才丢账本条目——网络故障时留着下次再试，
+      // 否则旧文件从此没人管，永久双份
       const renames = await kvReadRenames(kv);
       const ledgerOld = renames[slug];
       if (ledgerOld && SLUG_RE.test(ledgerOld)) {
         const ledgerPath = `${POSTS_DIR}/${ledgerOld}.md`;
-        const ledgerFile = await ghFetch(repoSegments('contents', ledgerPath)).catch(() => null);
-        if (ledgerFile) {
-          await ghFetch(repoSegments('contents', ledgerPath), {
+        const ledgerFile = await ghFetch(repoSegments('contents', ledgerPath)).catch((e) =>
+          e && e.status === 404 ? null : 'ERR'
+        );
+        if (ledgerFile === 'ERR') {
+          // 仓库状态暂时查不到：账本保留，等下次保存/入库再清
+        } else if (!ledgerFile) {
+          delete renames[slug]; // 旧文件已不在（404），账本使命完成
+          await kvWriteRenames(kv, renames);
+        } else {
+          const delOk = await ghFetch(repoSegments('contents', ledgerPath), {
             method: 'DELETE',
             body: { message: `CMS: 清理改名旧文件 ${ledgerOld}`, sha: ledgerFile.sha, branch: CFG.branch() },
-          }).catch(() => {});
+          })
+            .then(() => true)
+            .catch(() => false);
+          if (delOk) {
+            delete renames[slug];
+            await kvWriteRenames(kv, renames);
+          }
         }
-        delete renames[slug];
-        await kvWriteRenames(kv, renames);
       }
     }
     return json({ ok: true, slug, created: isNew, ...(warn ? { warn } : {}) });
@@ -862,14 +896,25 @@ async function handlePostsFlush() {
     return json({ ok: true, committed: 0 });
   }
 
-  // 攒批改名账本：入库的同一个 commit 里删掉仓库旧文件（tree 里 sha=null 即删除）
+  // 攒批改名账本：入库的同一个 commit 里删掉仓库旧文件（tree 里 sha=null 即删除）。
+  // 只有确认"旧文件将随本次 commit 删除"或"旧文件已不存在"才标记 renameHandled——
+  // 网络故障时账本保留，下次 flush 再试；现在就丢的话旧文件从此没人管，永久双份
   const renames = await kvReadRenames(kv);
   for (const it of items) {
     const ledgerOld = renames[it.slug];
     if (ledgerOld && SLUG_RE.test(ledgerOld) && ledgerOld !== it.slug) {
       const oldPath = `${POSTS_DIR}/${ledgerOld}.md`;
-      const oldFile = await ghFetch(repoSegments('contents', oldPath)).catch(() => null);
-      if (oldFile) it.deletePath = oldPath;
+      const oldFile = await ghFetch(repoSegments('contents', oldPath)).catch((e) =>
+        e && e.status === 404 ? null : 'ERR'
+      );
+      if (oldFile && oldFile !== 'ERR') {
+        it.deletePath = oldPath;
+        it.renameHandled = true;
+      } else if (oldFile === null) {
+        it.renameHandled = true; // 旧文件已不在（404），账本使命完成
+      }
+    } else {
+      it.renameHandled = true; // 无账本条目，无需处理
     }
   }
 
@@ -886,9 +931,19 @@ async function handlePostsFlush() {
     entries.push({ path: `${POSTS_DIR}/${it.slug}.md`, mode: '100644', type: 'blob', sha: blob.sha });
     if (it.deletePath) entries.push({ path: it.deletePath, mode: '100644', type: 'blob', sha: null });
   }
+  // 防御：同一棵树出现重复 path（stale 旧名同时作为"新建"与账本"删除"）会让 GitHub 拒树或行为未定义——
+  // 冲突时以删除为准（stale 内容不该入库），其余按出现顺序去重
+  const delPaths = new Set(entries.filter((e) => e.sha === null).map((e) => e.path));
+  const seenPaths = new Set();
+  const finalEntries = entries.filter((e) => {
+    if (e.sha !== null && delPaths.has(e.path)) return false;
+    if (seenPaths.has(e.path)) return false;
+    seenPaths.add(e.path);
+    return true;
+  });
   const tree = await ghFetch(repoSegments('git', 'trees'), {
     method: 'POST',
-    body: { base_tree: baseCommit.tree.sha, tree: entries },
+    body: { base_tree: baseCommit.tree.sha, tree: finalEntries },
   });
   const commit = await ghFetch(repoSegments('git', 'commits'), {
     method: 'POST',
@@ -903,16 +958,31 @@ async function handlePostsFlush() {
     if (e.status === 422) return fail('刚才有其他改动先入库了，请重试一次入库', 409);
     throw e;
   }
-  // 收尾只清"入库期间没再被保存过"的快照：时间戳变了说明 KV 里有更新版本，留给下次入库
+  // 收尾只清"入库期间没再被保存过"的快照：时间戳变了说明 KV 里有更新版本，留给下次入库。
+  // 删除失败重试一次，仍失败则保留 pend 索引——下次 flush 会再删（重复提交同内容只多花一次构建，无害）
   const latestPend = await kvReadPend(kv);
   for (const it of items) {
     if (latestPend[it.slug] !== undefined && latestPend[it.slug] !== atFlush[it.slug]) continue;
-    await kv.delete(kvPostKey(it.slug)).catch(() => {});
-    delete latestPend[it.slug];
+    let deleted = false;
+    try {
+      await kv.delete(kvPostKey(it.slug));
+      deleted = true;
+    } catch {
+      try {
+        await kv.delete(kvPostKey(it.slug));
+        deleted = true;
+      } catch {
+        deleted = false;
+      }
+    }
+    if (deleted) delete latestPend[it.slug];
   }
   await kvWritePend(kv, latestPend);
+  // 账本清理同样只动"本次已确认处理完"的条目：flush 期间新写的改名记录、网络失败未处理的都保留
   const latestRenames = await kvReadRenames(kv);
-  for (const it of items) delete latestRenames[it.slug];
+  for (const it of items) {
+    if (it.renameHandled) delete latestRenames[it.slug];
+  }
   await kvWriteRenames(kv, latestRenames);
   return json({
     ok: true,
@@ -1013,7 +1083,8 @@ async function handleVersionRestore(slug, request) {
 
 // ---------- 媒体接口 ----------
 
-const IMG_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,100}\.(png|jpe?g|webp|gif|avif)$/i;
+// 名字主体 ≤60 字符：hex 编码后 KV key 总长 ~124，远离官方 key 长度上限（超长名上传会神秘 500）
+const IMG_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,59}\.(png|jpe?g|webp|gif|avif)$/i;
 
 /**
  * KV 存储接入（零构建上传的核心）：图片字节存 EdgeOne Pages KV 命名空间，不走 git、
