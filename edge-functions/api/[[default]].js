@@ -903,12 +903,24 @@ async function handlePostsFlush() {
     if (e.status === 422) return fail('刚才有其他改动先入库了，请重试一次入库', 409);
     throw e;
   }
-  // 收尾只清"入库期间没再被保存过"的快照：时间戳变了说明 KV 里有更新版本，留给下次入库
+  // 收尾只清"入库期间没再被保存过"的快照：时间戳变了说明 KV 里有更新版本，留给下次入库。
+  // 删除失败重试一次，仍失败则保留 pend 索引——下次 flush 会再删（重复提交同内容只多花一次构建，无害）
   const latestPend = await kvReadPend(kv);
   for (const it of items) {
     if (latestPend[it.slug] !== undefined && latestPend[it.slug] !== atFlush[it.slug]) continue;
-    await kv.delete(kvPostKey(it.slug)).catch(() => {});
-    delete latestPend[it.slug];
+    let deleted = false;
+    try {
+      await kv.delete(kvPostKey(it.slug));
+      deleted = true;
+    } catch {
+      try {
+        await kv.delete(kvPostKey(it.slug));
+        deleted = true;
+      } catch {
+        deleted = false;
+      }
+    }
+    if (deleted) delete latestPend[it.slug];
   }
   await kvWritePend(kv, latestPend);
   const latestRenames = await kvReadRenames(kv);
@@ -1013,7 +1025,8 @@ async function handleVersionRestore(slug, request) {
 
 // ---------- 媒体接口 ----------
 
-const IMG_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,100}\.(png|jpe?g|webp|gif|avif)$/i;
+// 名字主体 ≤60 字符：hex 编码后 KV key 总长 ~124，远离官方 key 长度上限（超长名上传会神秘 500）
+const IMG_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,59}\.(png|jpe?g|webp|gif|avif)$/i;
 
 /**
  * KV 存储接入（零构建上传的核心）：图片字节存 EdgeOne Pages KV 命名空间，不走 git、

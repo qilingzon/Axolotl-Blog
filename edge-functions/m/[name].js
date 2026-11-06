@@ -6,7 +6,8 @@
 // 安全：名字先过白名单再拼 key，只能读到上传目录里的图；无鉴权但也不出站（只读 KV）。
 // 缓存：文件名带时间戳、内容与名字一一对应，响应可长缓存——访客命中缓存不再回源。
 
-const IMG_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,100}\.(png|jpe?g|webp|gif|avif)$/i;
+// 名字主体 ≤60 字符（与 API 侧 IMG_NAME_RE 同步收紧：hex 后 KV key 远离长度上限）
+const IMG_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,59}\.(png|jpe?g|webp|gif|avif)$/i;
 
 const CONTENT_TYPES = {
   png: 'image/png',

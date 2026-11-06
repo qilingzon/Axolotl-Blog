@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-11-06T15:34:59.198Z",
+  "sessionId": "sess_14ea8798-6b50-405d-ba3d-b3b57d36bf77",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "C:/Users/qiling/.zcode/tmp/probe_r4.py",
+  "outcome": "clear",
+  "coverage": "complete",
+  "findingCount": 0,
+  "durationMs": 16,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}

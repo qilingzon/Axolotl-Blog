@@ -19,10 +19,21 @@ var THEMES = [
   { id: 'lumen-cave', label: '荧光洞窟' },
 ];
 
+/** localStorage 安全读：隐私模式/被禁用时不让顶层初始化崩掉整个脚本 */
+function lsGet(k) {
+  try {
+    return localStorage.getItem(k);
+  } catch (e) {
+    return null;
+  }
+}
+
+var blockEditorUndoHandler = null; // 当前块编辑器的 document 撤销监听（反复进出编辑器先摘旧再挂新，防监听器累积）
+
 var state = {
-  token: localStorage.getItem('cms-token') || '',
-  expiresAt: Number(localStorage.getItem('cms-expires') || 0),
-  user: localStorage.getItem('cms-user') || '',
+  token: lsGet('cms-token') || '',
+  expiresAt: Number(lsGet('cms-expires') || 0),
+  user: lsGet('cms-user') || '',
   postsCache: null,
 };
 
@@ -1942,29 +1953,31 @@ function createBlockEditor(deps) {
 
   function uploadIntoBlock(idx, files) {
     var b = blocks[idx];
+    // 图片块只有一个位置：多张一起拖/贴时只收第一张，其余提示放弃——
+    // 旧行为每张都覆盖 b.url，前面的图传完即成无引用孤儿（占服务端存储、媒体库显示"暂无文章使用"）
+    var list = Array.prototype.slice.call(files);
+    if (list.length > 1) {
+      toast('一次只放进第一张图，其余 ' + (list.length - 1) + ' 张已忽略');
+    }
     toast('正在压缩并上传图片……');
-    var chain = Promise.resolve();
-    Array.prototype.forEach.call(files, function (f) {
-      chain = chain
-        .then(function () {
-          return uploadImageFile(f);
-        })
-        .then(function (r) {
-          b.url = r.url;
-          if (!b.alt) b.alt = f.name.replace(/\.[^.]+$/, '');
-          renderAll(idx);
-          changed('structure');
-          toast('图片已上传');
-        })
-        .catch(function (err) {
-          toast(err.message, true);
-        });
-    });
+    uploadImageFile(list[0])
+      .then(function (r) {
+        b.url = r.url;
+        if (!b.alt) b.alt = list[0].name.replace(/\.[^.]+$/, '');
+        renderAll(idx);
+        changed('structure');
+        toast('图片已上传');
+      })
+      .catch(function (err) {
+        toast(err.message, true);
+      });
   }
 
   // 结构性撤销：Ctrl+Z / Ctrl+Y（焦点在输入框内时交给浏览器原生撤销）
-  // 绑在 document 上：块操作后焦点可能落在 body，容器级监听会收不到
-  document.addEventListener('keydown', function (e) {
+  // 绑在 document 上：块操作后焦点可能落在 body，容器级监听会收不到。
+  // 每次进编辑器先摘掉上一实例的监听再挂新的——反复进出不再累积游离闭包（监听器泄露修复）
+  if (blockEditorUndoHandler) document.removeEventListener('keydown', blockEditorUndoHandler);
+  blockEditorUndoHandler = function (e) {
     if (!root.offsetParent) return; // 小白面板未显示时不拦
     var mod = e.ctrlKey || e.metaKey;
     if (!mod) return;
@@ -1979,7 +1992,8 @@ function createBlockEditor(deps) {
       e.preventDefault();
       deps.step(1);
     }
-  });
+  };
+  document.addEventListener('keydown', blockEditorUndoHandler);
 
   // ---------- 添加块 ----------
 

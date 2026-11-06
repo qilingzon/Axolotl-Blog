@@ -224,6 +224,12 @@ t('IMG_NAME_RE 白名单：合法名过、路径穿越与中文被拒', () => {
   assert.ok(!IMG_NAME_RE.test('a.png.exe'));
 });
 
+t('IMG_NAME_RE 长度防线：主体 60 过、61 拒（hex 后 KV key 远离长度上限）', () => {
+  assert.ok(IMG_NAME_RE.test('a'.repeat(60) + '.webp'));
+  assert.ok(!IMG_NAME_RE.test('a'.repeat(61) + '.webp'));
+  assert.ok(IMG_NAME_RE.test('probe.webp')); // 短名不受影响
+});
+
 t('imgContentType 按扩展名给对 MIME', () => {
   assert.equal(imgContentType('a.jpg'), 'image/jpeg');
   assert.equal(imgContentType('a.webp'), 'image/webp');

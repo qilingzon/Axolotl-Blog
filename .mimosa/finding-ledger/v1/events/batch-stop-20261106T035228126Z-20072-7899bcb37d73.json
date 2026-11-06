@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20261106T035228126Z-20072-7899bcb37d73",
+  "runId": "20261106T035228126Z-20072-7899bcb37d73",
+  "runStatus": "completed",
+  "coverage": {
+    "status": "complete",
+    "reasons": []
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "b142b4f7564c5ca7ce6da1b39d4f882ec84f45a4",
+  "diffHash": "51e4b3b8f0ca61abfc4838bd391624fcd5915bbe95a65f38105f2736c88600be",
+  "rulesVersion": "unavailable",
+  "sessionHash": "4e9fb982349d982c92323ef867fda797c76f2fe8f49f24770846f94cb127d887",
+  "reportRef": ".mimosa/reports/task-review-session_525068c1be63144f73c4467647e628f8-20261106T035228126Z-20072-7899bcb37d73.json",
+  "events": [],
+  "observedFindingIds": [],
+  "verifiedFiles": [
+    {
+      "file": "edge-functions/m/[name].js",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "edge-functions/api/[[default]].js",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "public/admin/app.js",
+      "direct": "complete",
+      "projectContext": "partial"
+    }
+  ],
+  "recordedAt": "2026-11-06T03:52:28.538Z"
+}
