@@ -1,14 +1,14 @@
 {
   "schemaVersion": "mimosa-hook-status/v1",
-  "recordedAt": "2026-11-06T17:51:04.209Z",
+  "recordedAt": "2026-11-06T17:53:50.451Z",
   "sessionId": "session_525068c1be63144f73c4467647e628f8",
   "event": "PostToolUse",
-  "toolName": "Write",
-  "file": "public/robots.txt",
+  "toolName": "Edit",
+  "file": "public/admin/app.js",
   "outcome": "clear",
   "coverage": "complete",
   "findingCount": 0,
-  "durationMs": 5,
+  "durationMs": 18,
   "hostState": "hook_complete",
   "reportHint": ".mimosa/reports/"
 }

@@ -776,7 +776,7 @@ function renderDashboard() {
               esc(data.pending) +
               ' 篇改动还没入库（最老 ' +
               fmtHoursOld(data.pendingOldest) +
-              '）——访客已能看到最新版，入库后站点构建一次全部落定</span><button type="button" class="btn btn--sm" id="flush-now">立即入库</button></div>'
+              '，满 ' + flushThreshold() + ' 篇自动入库）——访客已能看到最新版，入库后站点构建一次全部落定</span><button type="button" class="btn btn--sm" id="flush-now">立即入库</button></div>'
             : '') +
           '<div class="stats">' +
           statCard(posts.length, '篇文章', '/assets/axolotl-cyan.png', '#/posts', '看全部文章') +
