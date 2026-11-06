@@ -14,17 +14,20 @@ const { safeEqual, b64ToBytes, stripQuotes, postRefsImage } = mod;
 const appCode = readFileSync(new URL('../public/admin/app.js', import.meta.url), 'utf8');
 const parseBlocksCode = appCode.match(/function parseBlocks[\s\S]*?\n\}/)[0];
 const blocksToMarkdownCode = appCode.match(/function blocksToMarkdown[\s\S]*?\n\}/)[0];
-const parseBlocks = new Function('return ' + parseBlocksCode)();
-const blocksToMarkdown = new Function('return ' + blocksToMarkdownCode)();
+const splitUnescapedCode = appCode.match(/function splitUnescaped[\s\S]*?\n\}/)[0];
+// parseBlocks/blocksToMarkdown 依赖 splitUnescaped（表格转义切分），提取时一并注入作用域
+const parseBlocks = new Function(splitUnescapedCode + '\nreturn ' + parseBlocksCode)();
+const blocksToMarkdown = new Function(splitUnescapedCode + '\nreturn ' + blocksToMarkdownCode)();
 // 渲染安全管线（esc/safeUrl/safeImgTag/renderMarkdown 同作用域提取，验证白名单与协议过滤）
 const mdSandbox = new Function(
   appCode.match(/function esc[\s\S]*?\n\}/)[0] +
     '\n' + appCode.match(/function safeUrl[\s\S]*?\n\}/)[0] +
+    '\n' + appCode.match(/function splitUnescaped[\s\S]*?\n\}/)[0] +
     '\n' + appCode.match(/function safeImgTag[\s\S]*?\n\}/)[0] +
     '\n' + appCode.match(/function renderMarkdown[\s\S]*?\n\}/)[0] +
-    '\nreturn { esc: esc, safeUrl: safeUrl, safeImgTag: safeImgTag, renderMarkdown: renderMarkdown };'
+    '\nreturn { esc: esc, safeUrl: safeUrl, splitUnescaped: splitUnescaped, safeImgTag: safeImgTag, renderMarkdown: renderMarkdown };'
 )();
-const { safeUrl, safeImgTag, renderMarkdown } = mdSandbox;
+const { safeUrl, splitUnescaped, safeImgTag, renderMarkdown } = mdSandbox;
 
 let pass = 0;
 let fail = 0;
@@ -72,7 +75,7 @@ setTimeout(() => {
     fail++;
   }
   finish();
-}, 5000).unref();
+}, 5000); // 不 unref：挂起的异步用例必须拦住退出，否则出现假通过
 
 // ---------- normalizeDate：日期防线 ----------
 
@@ -374,6 +377,21 @@ t('safeUrl 白名单：http(s)/站内/锚点/相对路径过，javascript:/data:
   assert.equal(safeUrl('javascript:alert(1)'), '');
   assert.equal(safeUrl('data:text/html;base64,xxx'), '');
   assert.equal(safeUrl(''), '');
+});
+
+t('safeUrl 拒绝协议相对 URL（// 与 /\\ 会被浏览器解析成站外）', () => {
+  assert.equal(safeUrl('//evil.com/x'), '');
+  assert.equal(safeUrl('/\\evil.com/x'), '');
+  assert.equal(safeUrl('/'), '/'); // 站内根路径不受影响
+  assert.equal(safeUrl('/m/a.webp'), '/m/a.webp');
+});
+
+t('splitUnescaped：\\| 不切列、a\\\\\\|b 真分隔、Safari<16.4 可跑（无 lookbehind）', () => {
+  assert.deepEqual(splitUnescaped('a\\|b'), ['a\\|b']); // 转义竖线不切
+  assert.deepEqual(splitUnescaped('a\\\\|b'), ['a\\\\', 'b']); // 双反斜杠=字面反斜杠，| 是真分隔符
+  assert.deepEqual(splitUnescaped('a|b|c'), ['a', 'b', 'c']);
+  assert.deepEqual(splitUnescaped('a\\|b|c'), ['a\\|b', 'c']);
+  assert.deepEqual(splitUnescaped(''), ['']);
 });
 
 t('safeImgTag 属性白名单：事件属性丢弃、自家图片块格式无损', () => {

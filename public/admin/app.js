@@ -364,6 +364,7 @@ var navSeq = 0;
 
 function nav() {
   var hash = location.hash || '#/dashboard';
+  navSeq++; // 任何分支（含早退）都作废旧路由的在途异步渲染：迟到回调不许落页
   if (editorGuard && editorGuard.isDirty() && !restoringHash && hash !== editorGuard.route) {
     if (editorGuard.askPending) return; // 已有确认弹窗在问：后续导航等用户表态，不许叠出一摞弹窗
     editorGuard.askPending = true;
@@ -401,7 +402,6 @@ function nav() {
     return;
   }
   var parts = hash.slice(2).split('/');
-  navSeq++; // 作废所有在途异步渲染：fetch 回来时若路由已变，回调里会因序号不符而放弃渲染
   if (parts[0] === 'editor' && parts[1]) {
     var edSlug = parts[1];
     try {
@@ -1096,13 +1096,34 @@ function renderTags() {
 // ---------- Markdown 渲染（轻量实现，覆盖常用语法） ----------
 
 /** URL 白名单：只放行 http(s)、站内根路径、锚点、mailto 和无协议冒号的相对路径。
- *  javascript:/data: 等一律拒绝——这是预览与访客热替换共用的管道，不能给注入留口子 */
+ *  javascript:/data: 等一律拒绝——这是预览与访客热替换共用的管道，不能给注入留口子。
+ *  协议相对 URL（//evil.com、/\evil.com）会被浏览器解析成站外，同样拒绝 */
 function safeUrl(u) {
   var s = String(u || '').trim();
   if (!s) return '';
-  if (/^(https?:\/\/|\/|#|mailto:)/i.test(s)) return s;
-  if (s.indexOf(':') === -1) return s; // 纯相对路径（无协议冒号）
+  if (/^(https?:\/\/|mailto:)/i.test(s)) return s;
+  if (s === '/' || /^\/[^/\\]/.test(s)) return s; // 站内根路径（第二字符不得是 / 或 \）
+  if (s.charAt(0) === '#') return s;
+  if (s.indexOf(':') === -1 && s.indexOf('\\') === -1 && s.charAt(0) !== '/') return s;
   return '';
+}
+
+/** 按"未被反斜杠转义的 |"切分。不用正则 lookbehind（Safari<16.4 会 SyntaxError 让整个后台挂掉）；
+ *  逐字符扫描还能正确处理 a\\|b（双反斜杠=字面反斜杠，后面的 | 是真分隔符） */
+function splitUnescaped(s) {
+  var parts = [''];
+  for (var i = 0; i < s.length; i++) {
+    var ch = s.charAt(i);
+    if (ch === '\\' && i + 1 < s.length) {
+      parts[parts.length - 1] += ch + s.charAt(i + 1);
+      i++;
+    } else if (ch === '|') {
+      parts.push('');
+    } else {
+      parts[parts.length - 1] += ch;
+    }
+  }
+  return parts;
 }
 
 /** 独立成行 <img> 按属性白名单重建：只保留 src/alt/style(max-width:N%)。
@@ -1253,7 +1274,7 @@ function renderMarkdown(src) {
         var t = String(r || '').trim();
         var hasLeading = t.charAt(0) === '|';
         var hasTrailing = t.length > 1 && t.charAt(t.length - 1) === '|' && t.slice(-2) !== '\\|';
-        var parts = t.split(/(?<!\\)\|/);
+        var parts = splitUnescaped(t);
         if (hasLeading) parts.shift();
         if (hasTrailing) parts.pop();
         return parts.map(function (c) { return c.trim().replace(/\\\|/g, '|'); });
@@ -1361,7 +1382,7 @@ function parseBlocks(md) {
         var hasLeadingPipe = s.charAt(0) === '|';
         var hasTrailingPipe = s.length > 1 && s.charAt(s.length - 1) === '|' && s.slice(-2) !== '\\|';
         // 只在未被 \ 转义的 | 处切列：a\|b 是一个格子；切完再把 \| 还原成 |
-        var cells = s.split(/(?<!\\)\|/);
+        var cells = splitUnescaped(s);
         if (hasLeadingPipe) cells.shift();
         if (hasTrailingPipe) cells.pop();
         return cells.map(function (c) { return c.trim().replace(/\\\|/g, '|'); });
